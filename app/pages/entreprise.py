@@ -18,7 +18,7 @@ def display(df_comp, df_ent):
 
         image_url = info.get("URL", "")
         if isinstance(image_url, str) and image_url.startswith("http"):
-            st.image(image_url, use_column_width=True, caption="Logo / image")
+            st.image(image_url, use_container_width=True, caption="Logo / image")
 
         st.markdown("**Description** :")
         st.markdown(info.get("Description", "N/A"))

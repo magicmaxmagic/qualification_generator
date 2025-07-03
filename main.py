@@ -2,9 +2,15 @@ import streamlit as st
 from app import utils
 from app.pages import home, comparatif, entreprise, alignement
 
-st.set_page_config(page_title="Rapport de qualification", layout="wide")
-st.title("Rapport de qualification")
+st.set_page_config(
+    page_title="Tableau de bord IVÉO",
+    layout="wide",
+    page_icon="🟢"
+)
 
+with st.sidebar:
+    st.image("https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg", use_container_width=True)
+    
 # --- UPLOADER ---
 uploaded_file = st.file_uploader("Dépose ton fichier Excel ici (.xlsx)", type=["xlsx"])
 
