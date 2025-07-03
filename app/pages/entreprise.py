@@ -5,7 +5,9 @@ import pandas as pd
 def display(df_comp, df_ent):
     st.title("Fiche entreprise")
 
-    entreprise = st.selectbox("Choisissez une entreprise", df_comp["Entreprises"].unique())
+    entreprises = df_comp["Entreprises"].dropna().unique().tolist()
+    entreprise = st.sidebar.selectbox("Choisissez une entreprise", entreprises)
+
     row = df_comp[df_comp["Entreprises"] == entreprise].iloc[0]
     info = df_ent[df_ent["Entreprises"] == entreprise].iloc[0]
 
@@ -37,18 +39,9 @@ def display(df_comp, df_ent):
             r=list(radar_data.values()),
             theta=list(radar_data.keys()),
             line_close=True,
-            title="Évaluation par critère",
+            range_r=[0, 5],
+            template="simple_white",
         )
-        fig.update_traces(fill='toself', line=dict(color="#1f8a70", width=3))
-        fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 5], showline=False, gridcolor="#e0e0e0"),
-                angularaxis=dict(tickfont=dict(size=12))
-            ),
-            title_x=0.5,
-            plot_bgcolor="#ffffff",
-            paper_bgcolor="#ffffff",
-            font=dict(size=14)
-        )
+        fig.update_layout(title_text="Évaluation par critère", title_x=0.5)
         st.plotly_chart(fig, use_container_width=True)
 

@@ -1,7 +1,8 @@
 import streamlit as st
 from app import utils
 from app.pages import home, comparatif, entreprise, alignement
-
+from app.pages.alignement import display
+from app.utils import load_data 
 # --- DOIT ÊTRE LA PREMIÈRE COMMANDE STREAMLIT ---
 st.set_page_config(
     page_title="Tableau de bord IVÉO",
@@ -26,7 +27,6 @@ uploaded_file = st.file_uploader("Dépose ton fichier Excel ici (.xlsx)", type=[
 if uploaded_file:
     # Lecture dynamique depuis le fichier uploadé
     df_comp, df_ent, df_align = utils.load_data(uploaded_file)
-
     # --- Navigation dans la sidebar ---
     page = st.sidebar.radio("Navigation", ["Home", "Comparatif", "Entreprise", "Alignement avec le besoin"])
 

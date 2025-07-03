@@ -1,14 +1,11 @@
 import streamlit as st
 import plotly.express as px
+import pandas as pd
 
 def display(df_comp):
     st.title("Comparatif global des entreprises")
 
-    selected_cols = st.multiselect("Colonnes à afficher", df_comp.columns.tolist(), default=[
-        "Entreprises", "Score Golbal", "Alignement avec les besoins"])
-    st.dataframe(df_comp[selected_cols])
-
-    st.subheader("Graphiques radar")
+    # Colonnes utilisées pour les radars
     radar_cols = [
         "Alignement avec les besoins",
         "Avantage compétitif",
@@ -18,23 +15,52 @@ def display(df_comp):
         "Degré d'accompagnement"
     ]
 
-    for _, row in df_comp.iterrows():
+    # Filtrer les entreprises avec données valides sur toutes les colonnes radar
+    df_valid = df_comp.dropna(subset=radar_cols, how='any')
+    entreprises_disponibles = df_valid["Entreprises"].dropna().unique().tolist()
+
+    # Sidebar : filtre sur les entreprises
+    with st.sidebar:
+        st.markdown("### Filtrer les entreprises")
+        selected_entreprises = st.multiselect(
+            "Entreprises à afficher",
+            options=entreprises_disponibles,
+            default=entreprises_disponibles
+        )
+
+    # Filtrage du DataFrame
+    df_filtered = df_valid[df_valid["Entreprises"].isin(selected_entreprises)]
+
+    # Multiselect des colonnes à afficher dans le tableau
+    selected_cols = st.multiselect(
+        "Colonnes à afficher dans le tableau",
+        df_filtered.columns.tolist(),
+        default=["Entreprises", "Score Golbal", "Alignement avec les besoins"]
+    )
+
+    # Affichage du tableau
+    st.markdown("### Données comparatives")
+    st.dataframe(df_filtered[selected_cols], use_container_width=True)
+
+    # Affichage des radars
+    st.markdown("### Graphiques radar")
+
+    for _, row in df_filtered.iterrows():
+        entreprise = row["Entreprises"]
+        values = [row[c] for c in radar_cols]
+
         fig = px.line_polar(
-            r=[row[c] for c in radar_cols],
+            r=values,
             theta=radar_cols,
             line_close=True,
-            title=row["Entreprises"]
+            title=f"{entreprise} – Évaluation",
+            range_r=[0, 5]
         )
-        fig.update_traces(fill='toself', line=dict(color="#457b9d", width=2.5))
+        fig.update_traces(fill='toself')
         fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 5], showline=False, gridcolor="#e0e0e0"),
-                angularaxis=dict(tickfont=dict(size=11))
-            ),
-            title_x=0.5,
-            plot_bgcolor="#ffffff",
-            paper_bgcolor="#ffffff",
-            font=dict(size=13)
+            margin=dict(t=40, b=40),
+            polar=dict(bgcolor="white"),
+            paper_bgcolor="white",
+            title_x=0.5
         )
         st.plotly_chart(fig, use_container_width=True)
-
