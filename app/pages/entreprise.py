@@ -37,7 +37,18 @@ def display(df_comp, df_ent):
             r=list(radar_data.values()),
             theta=list(radar_data.keys()),
             line_close=True,
-            range_r=[0, 5],
-            title="Évaluation par critère"
+            title="Évaluation par critère",
+        )
+        fig.update_traces(fill='toself', line=dict(color="#1f8a70", width=3))
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 5], showline=False, gridcolor="#e0e0e0"),
+                angularaxis=dict(tickfont=dict(size=12))
+            ),
+            title_x=0.5,
+            plot_bgcolor="#ffffff",
+            paper_bgcolor="#ffffff",
+            font=dict(size=14)
         )
         st.plotly_chart(fig, use_container_width=True)
+

@@ -1,0 +1,32 @@
+/* styles.css */
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #f5f8fa;
+}
+
+h1, h2, h3, h4 {
+    color: #333;
+    font-family: 'Open Sans', sans-serif;
+}
+.sidebar .stImage {
+    padding: 10px;
+}
+
+[data-testid="stHeader"] {
+    background-color: #ffffff;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #e6f0ff;
+}
+
+table {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+}
+
+thead {
+    background-color: #0b2e59;
+    color: white;
+}
+

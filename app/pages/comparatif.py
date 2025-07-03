@@ -25,4 +25,16 @@ def display(df_comp):
             line_close=True,
             title=row["Entreprises"]
         )
+        fig.update_traces(fill='toself', line=dict(color="#457b9d", width=2.5))
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 5], showline=False, gridcolor="#e0e0e0"),
+                angularaxis=dict(tickfont=dict(size=11))
+            ),
+            title_x=0.5,
+            plot_bgcolor="#ffffff",
+            paper_bgcolor="#ffffff",
+            font=dict(size=13)
+        )
         st.plotly_chart(fig, use_container_width=True)
+

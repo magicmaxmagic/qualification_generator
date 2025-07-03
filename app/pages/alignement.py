@@ -19,5 +19,5 @@ def display(df_align):
             else:
                 df_filtered[col] = df_filtered[col].map(icon_map_other).fillna(df_filtered[col])
 
-    st.markdown("### Grille d'exigences")
+    st.markdown("### Grille d'évaluation des exigences")
     st.dataframe(df_filtered, use_container_width=True)
