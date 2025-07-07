@@ -1,55 +1,50 @@
+# app/pages/home.py
+
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+from sidebar import show_sidebar
 
-def display(df_comp):
+def display(df_comp: pd.DataFrame):
     st.title("Rapport de qualification – Vue d'ensemble")
 
-    # --- 1) Initialiser les clés de session si nécessaire ---
+    # --- 1) Récupérer la liste des entreprises ---
     entreprises = df_comp["Entreprises"].dropna().unique().tolist()
-    if "home_selected" not in st.session_state:
-        st.session_state.home_selected = entreprises.copy()
-    if "home_color_map" not in st.session_state:
-        st.session_state.home_color_map = {ent: "#0072B2" for ent in entreprises}
-    if "home_hist_color" not in st.session_state:
-        st.session_state.home_hist_color = "#0072B2"
 
-    # --- 2) Sidebar : filtrer les entreprises ---
-    st.sidebar.markdown("### Filtrer les entreprises")
-    selected = st.sidebar.multiselect(
-        "Entreprises à afficher",
+    # --- 2) Sidebar : filtrer les entreprises (persisté via cookies/session) ---
+    selected = show_sidebar(
+        label="Entreprises à afficher",
         options=entreprises,
-        default=st.session_state.home_selected,
-        key="home_selected",
+        default=entreprises,
+        multiselect=True
     )
     if not selected:
         st.warning("Veuillez sélectionner au moins une entreprise.")
         return
 
-    # --- 3) Sidebar : couleurs personnalisées par entreprise ---
+    # --- 3) Sidebar : couleurs par entreprise (persistées) ---
     st.sidebar.markdown("### Couleurs par entreprise")
+    color_map = {}
     for ent in selected:
-        st.session_state.home_color_map[ent] = st.sidebar.color_picker(
-            f"{ent}",
-            value=st.session_state.home_color_map.get(ent, "#0072B2"),
-            key=f"color_{ent}"
+        key = f"color_{ent}"
+        col = st.sidebar.color_picker(
+            ent,
+            st.session_state.get(key, "#0072B2"),
+            key=key
         )
-    color_map = {ent: st.session_state.home_color_map[ent] for ent in selected}
+        color_map[ent] = col
 
-    # --- 4) Sidebar : couleur de l’histogramme ---
-    st.sidebar.markdown("### Couleur de la répartition")
-    # Le color_picker avec cette clé met à jour st.session_state.home_hist_color
+    # --- 4) Sidebar : couleur de l'histogramme (persistée) ---
     hist_color = st.sidebar.color_picker(
         "Histogramme",
-        value=st.session_state.home_hist_color,
+        st.session_state.get("home_hist_color", "#0072B2"),
         key="home_hist_color"
     )
 
-    # --- 5) Préparer les données filtrées ---
+    # --- 5) Filtrer et nettoyer le DataFrame ---
     df = df_comp[df_comp["Entreprises"].isin(selected)].copy()
-    # gérer l'orthographe "Golbal" ou "Global"
     if "Score Golbal" in df.columns:
-        df = df.rename(columns={"Score Golbal": "Score Global"})
+        df.rename(columns={"Score Golbal": "Score Global"}, inplace=True)
     df["Score Global"] = pd.to_numeric(df["Score Global"], errors="coerce")
     df = df[df["Score Global"].notna()]
     if df.empty:

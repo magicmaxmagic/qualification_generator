@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 from plotly.subplots import make_subplots
-from sidebar import show_sidebar_comparatif
+from sidebar import show_sidebar, show_sidebar_comparatif, show_sidebar_alignement
 
 def display(df_comp):
     st.title("Comparatif global des entreprises")
@@ -41,7 +41,8 @@ def display(df_comp):
     selected_cols = st.sidebar.multiselect(
         "Sélectionnez les colonnes à afficher",
         options=df_filtered.columns.tolist(),
-        default=default_cols
+        default=default_cols,
+        key="cmp_table_cols"
     )
 
     # 6) Affichage du tableau de données
