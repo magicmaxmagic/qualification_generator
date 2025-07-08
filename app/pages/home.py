@@ -3,8 +3,8 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-from sidebar import show_sidebar
-
+from sidebar import show_sidebar, cookies
+import json
 def display(df_comp: pd.DataFrame):
     st.title("Rapport de qualification – Vue d'ensemble")
 
@@ -22,24 +22,28 @@ def display(df_comp: pd.DataFrame):
         st.warning("Veuillez sélectionner au moins une entreprise.")
         return
 
-    # --- 3) Sidebar : couleurs par entreprise (persistées) ---
+    # --- 3) Sidebar : couleurs par entreprise (persistées via cookies) ---
     st.sidebar.markdown("### Couleurs par entreprise")
     color_map = {}
     for ent in selected:
-        key = f"color_{ent}"
-        col = st.sidebar.color_picker(
-            ent,
-            st.session_state.get(key, "#0072B2"),
-            key=key
-        )
+        KEY_COLOR = f"color_{ent}"
+        raw_col = cookies.get(KEY_COLOR)
+        default_col = raw_col if raw_col else "#0072B2"
+        col = st.sidebar.color_picker(ent, default_col, key=KEY_COLOR)
         color_map[ent] = col
+        cookies[KEY_COLOR] = col
 
-    # --- 4) Sidebar : couleur de l'histogramme (persistée) ---
-    hist_color = st.sidebar.color_picker(
-        "Histogramme",
-        st.session_state.get("home_hist_color", "#0072B2"),
-        key="home_hist_color"
-    )
+    # Nettoyage : supprimer les cookies des couleurs d'entreprises désélectionnées
+    valid_keys = {f"color_{e}" for e in entreprises}
+    for k in list(cookies.keys()):
+        if k.startswith("color_") and k not in valid_keys:
+            del cookies[k]
+
+    # --- 4) Sidebar : couleur de l'histogramme (persistée via cookies) ---
+    raw_hist = cookies.get("home_hist_color")
+    default_hist = raw_hist if raw_hist else "#0072B2"
+    hist_color = st.sidebar.color_picker("Histogramme", default_hist, key="home_hist_color")
+    cookies["home_hist_color"] = hist_color
 
     # --- 5) Filtrer et nettoyer le DataFrame ---
     df = df_comp[df_comp["Entreprises"].isin(selected)].copy()

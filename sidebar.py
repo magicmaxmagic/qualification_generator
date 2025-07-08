@@ -54,10 +54,18 @@ def show_sidebar_comparatif(
     for ent in sel:
         ckey = f"cmp_color_{ent}"
         prev = cookies.get(ckey)
-        base = prev if prev else _random_color()
+        if isinstance(prev, str) and prev.startswith("#") and len(prev) == 7:
+            base = prev
+        else:
+            base = _random_color()
         col = st.sidebar.color_picker(ent, base, key=ckey)
         couleurs[ent] = col
         cookies[ckey] = col
+        
+    all_color_keys = [f"cmp_color_{e}" for e in entreprises_disponibles]
+    for k in list(cookies.keys()):
+        if k.startswith("cmp_color_") and k not in all_color_keys:
+            del cookies[k]
 
     return sel, couleurs
 
@@ -70,7 +78,7 @@ def show_sidebar(
     KEY = f"{label.replace(' ', '_').lower()}_selected"
     raw = cookies.get(KEY)
     previous = json.loads(raw) if raw else (default or options[:1])
-    previous = [x for x in previous if x in options]
+    previous = [v for v in previous if v in options]
     if not previous:
         previous = default or options[:1]
     st.sidebar.markdown(f"### {label}")

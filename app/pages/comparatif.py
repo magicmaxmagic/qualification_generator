@@ -1,8 +1,10 @@
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
+import json
+from streamlit_cookies_manager import EncryptedCookieManager
 from plotly.subplots import make_subplots
-from sidebar import show_sidebar, show_sidebar_comparatif, show_sidebar_alignement
+from sidebar import show_sidebar, show_sidebar_comparatif, show_sidebar_alignement, cookies
 
 def display(df_comp):
     st.title("Comparatif global des entreprises")
@@ -38,12 +40,24 @@ def display(df_comp):
     st.sidebar.markdown("### Colonnes du tableau")
     default_cols = ["Entreprises", "Score Global"] + radar_cols[:2]
     default_cols = [c for c in default_cols if c in df_filtered.columns]
+
+    # Persistance via cookies
+    KEY_COLS = "cmp_table_cols"
+    raw = cookies.get(KEY_COLS)
+    prev = json.loads(raw) if raw else default_cols
+    # Ne garder que les colonnes encore disponibles
+    prev = [c for c in prev if c in df_filtered.columns]
+    if not prev:
+        prev = default_cols
+
     selected_cols = st.sidebar.multiselect(
         "Sélectionnez les colonnes à afficher",
         options=df_filtered.columns.tolist(),
-        default=default_cols,
-        key="cmp_table_cols"
+        default=prev,
+        key=KEY_COLS
     )
+    # Sauvegarde de la sélection
+    cookies[KEY_COLS] = json.dumps(selected_cols)
 
     # 6) Affichage du tableau de données
     st.markdown("#### Données comparatives")

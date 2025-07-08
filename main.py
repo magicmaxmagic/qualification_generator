@@ -1,5 +1,5 @@
-# main.py
 import streamlit as st
+import os
 
 # -----------------------------------------------------------------------------
 # 1) Configuration de la page — Doit être **le tout premier** appel Streamlit
@@ -47,17 +47,38 @@ with open("styles.css") as f:
 # 5) Sidebar : logo, uploader, navigation
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.image("https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg",
-             use_container_width=True)
+    st.image("https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg", use_container_width=True)
     st.markdown("---")
-    uploaded_file = st.file_uploader(
-        "Déposez votre fichier Excel (.xlsx)",
-        type="xlsx",
-        key="uploader",
+
+    # 5.a) chemin local persistent via cookies
+    last_path = sidebar.cookies.get("excel_path") or ""
+    path_input = st.text_input(
+        "Ou entrez le chemin local du fichier Excel",
+        value=last_path,
+        key="excel_path_input"
     )
+
+    uploaded_file = None
+    # si le fichier existe localement, on le charge
+    if path_input and os.path.isfile(path_input):
+        sidebar.cookies["excel_path"] = path_input
+        with open(path_input, "rb") as f:
+            data = f.read()
+        from io import BytesIO
+        uploaded_file = BytesIO(data)
+        uploaded_file.name = os.path.basename(path_input)
+    else:
+        # fallback sur l’upload classique
+        uploaded_file = st.file_uploader(
+            "Déposez votre fichier Excel (.xlsx)",
+            type="xlsx",
+            key="uploader",
+        )
+
     if not uploaded_file:
         st.info("Merci de déposer un fichier pour générer le rapport.")
         st.stop()
+
     st.markdown("---")
     page = st.radio(
         "Navigation",
