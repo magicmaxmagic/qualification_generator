@@ -4,7 +4,18 @@ import streamlit as st
 import pandas as pd
 from sidebar import show_sidebar, show_sidebar_alignement
 
-def display(df_align: pd.DataFrame):
+def display(all_dfs):
+    st.title("Alignement avec le besoin")
+    st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
+
+    df_align = all_dfs.get("Analyse comparative")
+    if df_align is None:
+        st.error("La feuille 'Alignement avec le besoin' est introuvable dans le fichier Excel.")
+        return
+    
+    st.write("Colonnes de la feuille Analyse comparative :", list(df_align.columns))
+    st.dataframe(df_align.head())
+
     st.title("Alignement avec le besoin")
     st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
 
@@ -61,10 +72,11 @@ def display(df_align: pd.DataFrame):
     # --- 8) Application des badges dans le DataFrame ---
     for col in entreprise_cols:
         df_filtered[col] = (
-            pd.to_numeric(df_filtered[col], errors="coerce")
+            pd.Series(df_filtered[col])
+            .apply(pd.to_numeric, errors="coerce")
             .fillna("")
             .astype(str)
-            .map(badge_map)
+            .replace(badge_map)
             .fillna("")  # pour les cellules vides
         )
 

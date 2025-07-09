@@ -2,54 +2,48 @@ import pandas as pd
 
 def load_data(file):
     """
-    Charge les trois DataFrames depuis le fichier Excel :
-     - feuille 'Comparatif'
+    Charge les trois DataFrames principaux depuis le fichier Excel :
+     - feuille 'Analyse comparative' (au lieu de 'Comparatif')
      - feuille 'Entreprise' ou 'Entreprises'
-     - feuille 'Alignement avec le besoin'
+     - feuille 'Evaluation de la finalité' (au lieu de 'Alignement avec le besoin')
+    Retourne : df_comp, df_ent, df_align
     """
-    # On force l'utilisation d'openpyxl pour gérer correctement tous les formats .xlsx et URL SharePoint
     xls = pd.ExcelFile(file, engine="openpyxl")
+    available_sheets = [sheet.strip() for sheet in xls.sheet_names]
 
-    # --- 1) Comparatif ---
-    if "Comparatif" not in xls.sheet_names:
-        raise ValueError(f"Feuille 'Comparatif' introuvable. Feuilles disponibles : {xls.sheet_names}")
-    df_comp = pd.read_excel(
-        xls,
-        sheet_name="Comparatif",
-        engine="openpyxl"
-    )
+    # --- 1) Analyse comparative (anciennement 'Comparatif') ---
+    sheet_comp = None
+    for name in ["Analyse comparative", "Comparatif"]:
+        if name in available_sheets:
+            sheet_comp = name
+            break
+    if sheet_comp is None:
+        raise ValueError(f"Feuille 'Analyse comparative' ou 'Comparatif' introuvable. Feuilles disponibles : {available_sheets}")
+    df_comp = pd.read_excel(xls, sheet_name=sheet_comp, engine="openpyxl")
 
-    # --- 2) Entreprise / Entreprises ---
-    if "Entreprise" in xls.sheet_names:
-        sheet_ent = "Entreprise"
-    elif "Entreprises" in xls.sheet_names:
-        sheet_ent = "Entreprises"
-    else:
-        raise ValueError(
-            f"Feuille entreprise introuvable. Cherché 'Entreprise' ou 'Entreprises' dans {xls.sheet_names}"
-        )
-    df_ent = pd.read_excel(
-        xls,
-        sheet_name=sheet_ent,
-        engine="openpyxl"
-    )
+    # --- 2) Entreprise(s) ---
+    sheet_ent = None
+    for name in ["Entreprises", "Entreprise"]:
+        if name in available_sheets:
+            sheet_ent = name
+            break
+    if sheet_ent is None:
+        raise ValueError(f"Feuille 'Entreprise' ou 'Entreprises' introuvable. Feuilles disponibles : {available_sheets}")
+    df_ent = pd.read_excel(xls, sheet_name=sheet_ent, engine="openpyxl")
 
-    # --- 3) Alignement avec le besoin ---
-    name_align = "Alignement avec le besoin"
-    if name_align not in xls.sheet_names:
-        raise ValueError(
-            f"Feuille '{name_align}' introuvable. Feuilles disponibles : {xls.sheet_names}"
-        )
-    df_align = pd.read_excel(
-        xls,
-        sheet_name=name_align,
-        header=0,
-        engine="openpyxl"
-    )
+    # --- 3) Alignement/Évaluation finale ---
+    sheet_align = None
+    for name in ["Evaluation de la finalité", "Alignement avec le besoin"]:
+        if name in available_sheets:
+            sheet_align = name
+            break
+    if sheet_align is None:
+        raise ValueError(f"Feuille 'Evaluation de la finalité' ou 'Alignement avec le besoin' introuvable. Feuilles disponibles : {available_sheets}")
+    df_align = pd.read_excel(xls, sheet_name=sheet_align, engine="openpyxl")
 
     # --- Nettoyage basique des colonnes ---
-    df_comp.columns  = [col.strip() for col in df_comp.columns]
-    df_ent.columns   = [col.strip() for col in df_ent.columns]
-    df_align.columns = [col.strip() for col in df_align.columns]
+    df_comp.columns  = [str(col).strip() for col in df_comp.columns]
+    df_ent.columns   = [str(col).strip() for col in df_ent.columns]
+    df_align.columns = [str(col).strip() for col in df_align.columns]
 
     return df_comp, df_ent, df_align

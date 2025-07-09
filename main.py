@@ -54,21 +54,15 @@ with st.sidebar:
     st.markdown("---")
 
     # 1) lire le dernier chemin ou URL depuis le cookie
-    last_ref = sidebar.cookies.get("excel_path") or ""
+    default_path = sidebar.cookies.get("excel_path") or ""
 
-    # 2) champ texte pour chemin local ou URL, pré-rempli
-    path_input = st.text_input(
-        "Chemin local ou URL du fichier Excel",
-        value=last_ref,
-        key="excel_path_input",
-    )
-
-    # 3) uploader drag & drop
+    # 2) uploader drag & drop
     upload = st.file_uploader(
         "Ou déposez un fichier Excel (.xlsx)",
         type="xlsx",
         key="uploader",
     )
+    path_input = default_path
     if upload:
         os.makedirs("uploads", exist_ok=True)
         saved_path = os.path.abspath(os.path.join("uploads", upload.name))
@@ -76,15 +70,21 @@ with st.sidebar:
             f.write(upload.getvalue())
         path_input = saved_path
         sidebar.cookies["excel_path"] = saved_path
-        st.session_state["excel_path_input"] = saved_path
+
+    # 3) champ texte pour chemin local ou URL, pré-rempli
+    path_input = st.text_input(
+        "Chemin local ou URL du fichier Excel",
+        value=path_input,
+        key="excel_path_input",
+    )
 
     # 4) déterminer la source effective
+    uploaded_file = None
     if path_input.startswith(("http://", "https://")):
         import requests
         from io import BytesIO
 
         url = path_input
-        # pour forcer le téléchargement sur SharePoint (“?download=1”)
         if "sharepoint.com" in url and "download=" not in url:
             base = url.split("?")[0]
             url = f"{base}?download=1"
@@ -95,14 +95,10 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Échec du téléchargement ({resp.status_code}) : {e}")
             st.stop()
-
         uploaded_file = BytesIO(resp.content)
-        # reconstitue un nom de fichier valide
         uploaded_file.name = os.path.basename(path_input.split("?")[0])
-        # on met à jour le cookie
         sidebar.cookies["excel_path"] = path_input
 
-    # sinon, chemin local existant
     elif os.path.isfile(path_input):
         with open(path_input, "rb") as f:
             data = f.read()
@@ -111,14 +107,14 @@ with st.sidebar:
         uploaded_file.name = os.path.basename(path_input)
         sidebar.cookies["excel_path"] = path_input
 
-    else:
+    if not uploaded_file:
         st.error("Fichier non trouvé. Déposez-le, corrigez le chemin ou utilisez une URL valide.")
         st.stop()
 
     st.markdown("---")
     page = st.radio(
         "Navigation",
-        ("Home", "Comparatif", "Entreprise", "Alignement avec le besoin"),
+        ("Entreprise", "Analyse comparative"),
         key="page_selector",
     )
 # -----------------------------------------------------------------------------
@@ -132,20 +128,28 @@ df_comp, df_ent, df_align = load_from_bytes(
     uploaded_file.name, uploaded_file.getvalue()
 )
 
+
+#st.markdown("#### Colonnes de la feuille Analyse comparative :")
+#st.write(list(df_comp.columns))
+
+
 # -----------------------------------------------------------------------------
 # 7) Dispatch selon la page
 # -----------------------------------------------------------------------------
-if page == "Home":
-    home.display(df_comp)
-elif page == "Comparatif":
-    comparatif.display(df_comp)
-elif page == "Entreprise":
-    entreprise.display(df_comp, df_ent)
-else:
-    alignement.display(df_align)
+if page == "Entreprise":
+    # On vérifie que le DataFrame est bien chargé et non vide
+    if df_ent is not None and not df_ent.empty:
+        entreprise.display(df_ent)
+    else:
+        st.error("Aucune donnée entreprise à afficher.")
+elif page == "Analyse comparative":
+    if df_align is not None and not df_align.empty:
+        alignement.display(df_align)
+    else:
+        st.error("Aucune donnée d'analyse comparative à afficher.")
 
 # -----------------------------------------------------------------------------
-# 8) Sauvegarde **une seule fois** des cookies
+# 8 Sauvegarde **une seule fois** des cookies
 # -----------------------------------------------------------------------------
 if "cookies_saved" not in st.session_state:
     sidebar.cookies.save()

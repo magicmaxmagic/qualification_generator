@@ -5,9 +5,16 @@ import plotly.express as px
 import pandas as pd
 from sidebar import show_sidebar, cookies
 import json
-def display(df_comp: pd.DataFrame):
-    st.title("Rapport de qualification – Vue d'ensemble")
 
+def display(all_dfs: dict):
+    st.title("Rapport de qualification – Vue d'ensemble")
+    
+    # --- 0) Récupérer la feuille "Comparatif" ---
+    df_comp = all_dfs.get("Comparatif")
+    if df_comp is None:
+        st.error("La feuille 'Comparatif' est introuvable dans le fichier Excel.")
+        return
+    
     # --- 1) Récupérer la liste des entreprises ---
     entreprises = df_comp["Entreprises"].dropna().unique().tolist()
 
