@@ -20,7 +20,7 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 import io
 from app import utils
-from app.pages import home, comparatif, entreprise, alignement
+from app.pages import home, comparatif, entreprise, alignement, solution
 import sidebar  # votre sidebar.py à la racine
 
 # -----------------------------------------------------------------------------
@@ -114,7 +114,7 @@ with st.sidebar:
     st.markdown("---")
     page = st.radio(
         "Navigation",
-        ("Entreprise", "Analyse comparative"),
+        ("Entreprise", "Solution", "Analyse comparative"),
         key="page_selector",
     )
 # -----------------------------------------------------------------------------
@@ -124,7 +124,7 @@ with st.sidebar:
 def load_from_bytes(name: str, raw: bytes):
     return utils.load_data(io.BytesIO(raw))
 
-df_comp, df_ent, df_align = load_from_bytes(
+df_comp, df_ent, df_align, df_sol = load_from_bytes(
     uploaded_file.name, uploaded_file.getvalue()
 )
 
@@ -142,6 +142,12 @@ if page == "Entreprise":
         entreprise.display(df_ent)
     else:
         st.error("Aucune donnée entreprise à afficher.")
+elif page == "Solution":
+    # On vérifie que le DataFrame est bien chargé et non vide
+    if df_sol is not None and not df_sol.empty:
+        solution.display(df_sol)
+    else:
+        st.error("Aucune donnée solution à afficher.")
 elif page == "Analyse comparative":
     if df_align is not None and not df_align.empty:
         alignement.display(df_align)

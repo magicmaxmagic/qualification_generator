@@ -324,7 +324,7 @@ def _random_color() -> str:
         random.randint(100, 200),
     )
 
-def create_sidebar_section(title: str, icon: str = "🔧"):
+def create_sidebar_section(title: str, icon: str = ""):
     """Crée une section stylée dans la sidebar avec effet premium"""
     st.sidebar.markdown(f"""
     <div style="
@@ -413,7 +413,7 @@ def show_sidebar_comparatif(
         font-size: 0.9rem;
         font-weight: 500;
     ">
-        💡 Sélectionnez les entreprises à comparer sur le graphique
+        Sélectionnez les entreprises à comparer sur le graphique
     </div>
     """, unsafe_allow_html=True)
     
@@ -432,13 +432,13 @@ def show_sidebar_comparatif(
                 help="Choisissez jusqu'à 6 entreprises pour une comparaison optimale"
             )
         if len(sel) > max_comparaison:
-            st.warning(f"⚠️ Au-delà de {max_comparaison} entreprises, le radar devient moins lisible.")
+            st.warning(f"Au-delà de {max_comparaison} entreprises, le radar devient moins lisible.")
 
     # on sérialise la sélection
     cookies[KEY_SEL] = json.dumps(sel)
 
     # Section couleurs avec style moderne et icône élégante
-    create_sidebar_section("Couleurs personnalisées", "🎨")
+    create_sidebar_section("Couleurs personnalisées", "")
     
     # Ajout d'un petit texte d'aide stylé
     st.sidebar.markdown("""
@@ -452,7 +452,7 @@ def show_sidebar_comparatif(
         font-size: 0.9rem;
         font-weight: 500;
     ">
-        🎯 Personnalisez la couleur de chaque entreprise
+        Personnalisez la couleur de chaque entreprise
     </div>
     """, unsafe_allow_html=True)
     
@@ -533,9 +533,9 @@ def show_sidebar(
     if "données" in label.lower():
         icon = "�"
     elif "filtre" in label.lower():
-        icon = "🔍"
+        icon = ""
     else:
-        icon = "📋"
+        icon = ""
     create_sidebar_section(label, icon)
     
     # Ajout d'un indicateur de sélection
@@ -553,7 +553,7 @@ def show_sidebar(
             font-size: 0.9rem;
             font-weight: 500;
         ">
-            📈 {selected_count}/{total_count} éléments sélectionnés
+            {selected_count}/{total_count} éléments sélectionnés
         </div>
         """, unsafe_allow_html=True)
         
@@ -576,7 +576,7 @@ def show_sidebar(
             font-size: 0.9rem;
             font-weight: 500;
         ">
-            🎯 Sélectionnez une option
+            Sélectionnez une option
         </div>
         """, unsafe_allow_html=True)
         
@@ -608,7 +608,7 @@ def show_sidebar_alignement(df_align) -> str:
         prev = types_[0] if types_ else ""
 
     # Section stylée avec icône spécialisée
-    create_sidebar_section("Type d'exigence", "⚖️")
+    create_sidebar_section("Type d'exigence", "")
     
     # Ajout d'informations contextuelles
     st.sidebar.markdown(f"""
@@ -622,7 +622,7 @@ def show_sidebar_alignement(df_align) -> str:
         font-size: 0.9rem;
         font-weight: 500;
     ">
-        🎯 {len(types_)} types d'exigences disponibles
+        {len(types_)} types d'exigences disponibles
     </div>
     """, unsafe_allow_html=True)
     

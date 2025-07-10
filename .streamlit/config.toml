@@ -1,6 +1,15 @@
+[server]
+# Désactiver le watchdog pour éviter les erreurs de cache
+fileWatcherType = "none"
+headless = true
+
+[client]
+# Désactiver l'affichage du bouton de déploiement
+showSidebarNavigation = false
+
 [theme]
-primaryColor = "#00A651"
+primaryColor = "#0072B2"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F2F2F2"
+secondaryBackgroundColor = "#E3F0FA"
 textColor = "#1C1C1C"
 font = "sans serif"

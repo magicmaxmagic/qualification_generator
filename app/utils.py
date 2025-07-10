@@ -2,11 +2,12 @@ import pandas as pd
 
 def load_data(file):
     """
-    Charge les trois DataFrames principaux depuis le fichier Excel :
+    Charge les quatre DataFrames principaux depuis le fichier Excel :
      - feuille 'Analyse comparative' (au lieu de 'Comparatif')
      - feuille 'Entreprise' ou 'Entreprises'
      - feuille 'Evaluation de la finalité' (au lieu de 'Alignement avec le besoin')
-    Retourne : df_comp, df_ent, df_align
+     - feuille 'Solutions' ou 'Solution'
+    Retourne : df_comp, df_ent, df_align, df_sol
     """
     xls = pd.ExcelFile(file, engine="openpyxl")
     available_sheets = [sheet.strip() for sheet in xls.sheet_names]
@@ -41,9 +42,20 @@ def load_data(file):
         raise ValueError(f"Feuille 'Evaluation de la finalité' ou 'Alignement avec le besoin' introuvable. Feuilles disponibles : {available_sheets}")
     df_align = pd.read_excel(xls, sheet_name=sheet_align, engine="openpyxl")
 
+    # --- 4) Solutions ---
+    sheet_sol = None
+    for name in ["Solutions", "Solution"]:
+        if name in available_sheets:
+            sheet_sol = name
+            break
+    if sheet_sol is None:
+        raise ValueError(f"Feuille 'Solutions' ou 'Solution' introuvable. Feuilles disponibles : {available_sheets}")
+    df_sol = pd.read_excel(xls, sheet_name=sheet_sol, engine="openpyxl")
+
     # --- Nettoyage basique des colonnes ---
     df_comp.columns  = [str(col).strip() for col in df_comp.columns]
     df_ent.columns   = [str(col).strip() for col in df_ent.columns]
     df_align.columns = [str(col).strip() for col in df_align.columns]
+    df_sol.columns   = [str(col).strip() for col in df_sol.columns]
 
-    return df_comp, df_ent, df_align
+    return df_comp, df_ent, df_align, df_sol
