@@ -78,21 +78,22 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     Carte professionnelle compacte avec transparence simple pour présentation client.
     Args:
         name (str): Nom de la solution.
-        logo_url (str): URL du logo.
+        logo_url (str): URL du logo (si vide, pas de logo affiché).
         color (str): Couleur principale.
         url_site (str): URL du site web.
         video (str): URL de la vidéo.
     """
     show_site = isinstance(url_site, str) and url_site.strip() and url_site.strip().lower() not in ['-', 'nan', 'aucun', 'none']
-    show_video = isinstance(video, str) and 'youtube' in video and video.strip().lower() not in ['-', 'nan', 'aucun', 'none']
+    # Rendre la condition vidéo plus flexible - pas seulement YouTube
+    show_video = isinstance(video, str) and video.strip() and video.strip().lower() not in ['-', 'nan', 'aucun', 'none'] and ('youtube' in video.lower() or 'youtu.be' in video.lower() or 'vimeo' in video.lower() or 'http' in video.lower())
+    show_logo = isinstance(logo_url, str) and logo_url.strip() and logo_url.startswith('http')
 
-    # Logo professionnel compact avec transparence simple
-    if isinstance(logo_url, str) and logo_url.startswith('http'):
+    # Logo professionnel compact avec transparence simple (seulement si logo_url fourni)
+    logo = ''
+    if show_logo:
         logo = f"""<div style="width:60px;height:60px;border-radius:8px;background:{THEME['glass_bg']};padding:6px;border:1px solid {THEME['glass_border']};display:flex;align-items:center;justify-content:center;box-shadow:{THEME['glass_shadow']};transition:all 0.3s ease;">
             <img src='{logo_url}' width='48' style='border-radius:4px;max-width:100%;max-height:100%;object-fit:contain;' alt='Logo solution'/>
         </div>"""
-    else:
-        logo = f"""<div style="width:60px;height:60px;border-radius:8px;background:{THEME['glass_bg']};border:1px solid {THEME['glass_border']};display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:600;box-shadow:{THEME['glass_shadow']};transition:all 0.3s ease;">Logo</div>"""
 
     # Boutons professionnels compacts avec transparence simple
     btns = ''
@@ -111,19 +112,23 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     
     btns_html = f'<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">{btns}</div>' if btns else ''
 
-    # Carte professionnelle compacte avec transparence simple - Structure verticale
+    # Carte professionnelle compacte avec transparence simple
     html = (
         'display:flex;flex-direction:column;gap:12px;'
         f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-        'padding:16px 20px;max-width:600px;margin:0 auto 1rem auto;'
+        'padding:16px 20px;max-width:600px;margin:0 auto 0.5rem auto;'
         f'box-shadow:{THEME["glass_shadow"]};position:relative;'
         'transition: all 0.3s ease;'
     )
     
-    # Conteneur du haut : Logo + Nom (alignement centré avec gap réduit)
-    top_container = f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><div style="flex-shrink:0;">{logo}</div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;">'
-    top_container += f'<h2 style="font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>'
-    top_container += '</div></div>'
+    # Conteneur du haut : Logo + Nom (seulement si logo présent) ou Nom seul
+    if show_logo:
+        top_container = f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><div style="flex-shrink:0;">{logo}</div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;">'
+        top_container += f'<h2 style="font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>'
+        top_container += '</div></div>'
+    else:
+        # Nom seul, centré
+        top_container = f'<div style="display:flex;align-items:center;justify-content:center;"><h2 style="font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2></div>'
     
     # Conteneur du bas : Boutons
     bottom_container = f'<div style="display:flex;justify-content:center;width:100%;">{btns_html}</div>' if btns else ''
@@ -131,20 +136,20 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     card = f'<div style="{html}">{top_container}{bottom_container}</div>'
     
     st.markdown(_wrap_html(card, 600), unsafe_allow_html=True)
-
-def render_image_section(images_urls: list, uploaded_image=None):
+    
+def render_image_section(images_urls: list, uploaded_images=None):
     """
     Section d'affichage des images avec transparence simple.
     Args:
         images_urls (list): Liste des URLs d'images.
-        uploaded_image: Fichier image uploadé via Streamlit.
+        uploaded_images: Liste des fichiers images uploadés via Streamlit.
     """
     # Vérifier s'il y a des images à afficher
     has_url_images = images_urls and any(img.strip() for img in images_urls if isinstance(img, str) and img.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file'])
-    has_uploaded_image = uploaded_image is not None
+    has_uploaded_images = uploaded_images is not None and len(uploaded_images) > 0
     
     # Si aucune image, ne pas afficher la section
-    if not has_url_images and not has_uploaded_image:
+    if not has_url_images and not has_uploaded_images:
         return
     
     # Conteneur pour les images
@@ -178,26 +183,25 @@ def render_image_section(images_urls: list, uploaded_image=None):
         '''
         st.markdown(section_html, unsafe_allow_html=True)
     
-    # Afficher l'image uploadée avec Streamlit dans un conteneur stylé
-    if uploaded_image is not None:
-        
-        
-        # Afficher l'image dans un conteneur avec bordure arrondie
-        st.markdown(f'''
-        <div style="{images_style}">
-        ''', unsafe_allow_html=True)
-        
-        # Utiliser des colonnes pour centrer l'image
-        _, col2, _ = st.columns([1, 3, 1])
-        with col2:
-            st.image(
-                uploaded_image, 
-                use_container_width=True, 
-                caption=uploaded_image.name,
-                output_format="auto"
-            )
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Afficher les images uploadées avec Streamlit dans un conteneur stylé
+    if has_uploaded_images:
+        for i, uploaded_image in enumerate(uploaded_images):
+            # Afficher l'image dans un conteneur avec bordure arrondie
+            st.markdown(f'''
+            <div style="{images_style}">
+            ''', unsafe_allow_html=True)
+            
+            # Utiliser des colonnes pour centrer l'image
+            _, col2, _ = st.columns([1, 3, 1])
+            with col2:
+                st.image(
+                    uploaded_image, 
+                    use_container_width=True, 
+                    caption=f"Image uploadée: {uploaded_image.name}",
+                    output_format="auto"
+                )
+            
+            st.markdown('</div>', unsafe_allow_html=True)
 
 def render_section(title: str, bg: str = None):
     """
@@ -268,25 +272,34 @@ def display(df_sol: pd.DataFrame):
     cookies['solution_selected'] = json.dumps([selected])
     info = df_sol[df_sol[solution_column] == selected].iloc[0]
 
-    # Colors
-    color = st.sidebar.color_picker('Couleur principale', THEME['accent'])
+    # Couleur principale (retirée pour simplifier)
+    # color = st.sidebar.color_picker('Couleur principale', THEME['accent'])
     
-    # Champ pour ajouter une image
+    # Champs pour ajouter plusieurs images
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**Ajouter une image**")
+    st.sidebar.markdown("**Ajouter des images**")
     
-    # Option 1: URL d'image
-    image_url = st.sidebar.text_input(
-        "URL de l'image",
-        placeholder="https://exemple.com/image.jpg",
-        key='custom_image_url'
-    )
+    # Option 1: Plusieurs URLs d'images
+    st.sidebar.markdown("**URLs d'images**")
+    num_urls = st.sidebar.number_input("Nombre d'URLs d'images", min_value=0, max_value=5, value=1, key='num_image_urls')
     
-    # Option 2: Upload d'image
-    uploaded_image = st.sidebar.file_uploader(
-        "Télécharger une image",
+    image_urls = []
+    for i in range(num_urls):
+        url = st.sidebar.text_input(
+            f"URL de l'image {i+1}",
+            placeholder="https://exemple.com/image.jpg",
+            key=f'custom_image_url_{i}'
+        )
+        if url and url.strip():
+            image_urls.append(url.strip())
+    
+    # Option 2: Plusieurs uploads d'images
+    st.sidebar.markdown("**Télécharger des images**")
+    uploaded_images = st.sidebar.file_uploader(
+        "Sélectionner des images",
         type=['png', 'jpg', 'jpeg', 'gif', 'webp'],
-        key='uploaded_image'
+        accept_multiple_files=True,
+        key='uploaded_images'
     )
 
     # Style CSS pour un rendu professionnel avec transparence simple
@@ -373,20 +386,22 @@ def display(df_sol: pd.DataFrame):
         if isinstance(img_url, str) and img_url.strip():
             images_urls.append(img_url.strip())
     
-    # Ajouter l'image personnalisée si fournie (URL)
-    if image_url and image_url.strip():
-        images_urls.append(image_url.strip())
+    # Ajouter les images personnalisées (URLs multiples)
+    for url in image_urls:
+        if url and url.strip():
+            images_urls.append(url.strip())
     
-    # Ajouter l'image uploadée si fournie
-    if uploaded_image is not None:
-        images_urls.append('uploaded_file')
+    # Ajouter les images uploadées si fournies
+    if uploaded_images:
+        for _ in uploaded_images:
+            images_urls.append('uploaded_file')
     
-    has_images = bool(images_urls) or uploaded_image is not None
+    has_images = bool(images_urls) or bool(uploaded_images)
 
-    # Mise en page en deux colonnes : Description + Informations générales à gauche, Nom + Images à droite
+    # Mise en page en deux colonnes : Description à gauche, Nom/Logo à droite
     col_left, col_right = st.columns([1, 1])
     
-    # Colonne gauche : Description puis Informations générales
+    # Colonne gauche : Description
     with col_left:
         # Section Description avec transparence simple
         render_section('Description')
@@ -420,50 +435,10 @@ def display(df_sol: pd.DataFrame):
         </div>
         '''
         st.markdown(desc_html, unsafe_allow_html=True)
-
-        # Ligne séparatrice fine entre la description et les informations générales
-        st.markdown(SEPARATOR, unsafe_allow_html=True)
-
-        # Info Cards professionnelles avec transparence simple
-        render_section('Informations générales')
-        fields = [c for c in df_sol.columns if c != solution_column and c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
-        selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_solution')
-        
-        # Conteneur professionnel pour les cartes avec transparence simple
-        cards_container_style = (
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-            'padding:20px 24px;margin-bottom:1.5rem;'
-            f'box-shadow:{THEME["glass_shadow"]};'
-            'transition:all 0.3s ease;'
-            'position:relative;'
-            'overflow:hidden;'
-        )
-        
-        cards = ''
-        for i, f in enumerate(selected_fields):
-            val = info.get(f, 'N/A')
-            if pd.notna(val) and str(val).strip():
-                card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
-                card_style = (
-                    f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-                    'padding:14px 18px;margin:0 0 12px 0;width:100%;'
-                    f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
-                    'position:relative;overflow:hidden;'
-                )
-                cards += f'''<div style="{card_style}">
-                    <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
-                    <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
-                </div>'''
-        
-        if cards:
-            grid_section_html = f'''<div style="{cards_container_style}">
-                <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
-            </div>'''
-            st.markdown(grid_section_html, unsafe_allow_html=True)
     
-    # Colonne droite : Nom/Logo puis Images (si présentes)
+    # Colonne droite : Nom/Logo
     with col_right:
-        # Nom et boutons dans la carte premium avec transparence simple
+        # Récupérer les informations pour les boutons - même logique qu'entreprise.py
         url_site = ''
         for key in info.keys():
             if 'site' in key.lower() and 'web' in key.lower():
@@ -476,31 +451,132 @@ def display(df_sol: pd.DataFrame):
                 if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
                     url_site = val.strip()
                     break
-        # Nom de la solution uniquement (sans logo)
-        name_style = (
-            'display:flex;flex-direction:column;gap:12px;'
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-            'padding:16px 20px;max-width:600px;margin:0 auto 1rem auto;'
-            f'box-shadow:{THEME["glass_shadow"]};position:relative;'
-            'transition: all 0.3s ease;'
+        video = info.get('URL (vidéo)', '')
+        
+        # Utiliser render_logo_and_name sans logo (URL vide)
+        render_logo_and_name(selected, '', '#0072B2', url_site, video)
+
+    # Ligne séparatrice unique sur toute la largeur
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+
+    # Disposition adaptative des informations générales selon la présence d'images
+    if has_images:
+        # Mise en page en deux colonnes : Informations générales à gauche, Images à droite
+        col_left2, col_right2 = st.columns([1, 1])
+        
+        # Colonne gauche : Informations générales
+        with col_left2:
+            # Info Cards professionnelles avec transparence simple
+            render_section('Informations générales')
+            fields = [c for c in df_sol.columns if c != solution_column and c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
+            selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_solution')
+            
+            # Conteneur professionnel pour les cartes avec transparence simple
+            cards_container_style = (
+                f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+                'padding:20px 24px;margin-bottom:1.5rem;'
+                f'box-shadow:{THEME["glass_shadow"]};'
+                'transition:all 0.3s ease;'
+                'position:relative;'
+                'overflow:hidden;'
+            )
+            
+            cards = ''
+            for i, f in enumerate(selected_fields):
+                val = info.get(f, 'N/A')
+                if pd.notna(val) and str(val).strip():
+                    card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
+                    card_style = (
+                        f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+                        'padding:14px 18px;margin:0 0 12px 0;width:100%;'
+                        f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
+                        'position:relative;overflow:hidden;'
+                    )
+                    cards += f'''<div style="{card_style}">
+                        <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
+                        <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
+                    </div>'''
+            
+            if cards:
+                grid_section_html = f'''<div style="{cards_container_style}">
+                    <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
+                </div>'''
+                st.markdown(grid_section_html, unsafe_allow_html=True)
+        
+        # Colonne droite : Images
+        with col_right2:
+            render_section('Images')
+            render_image_section(images_urls, uploaded_images)
+    else:
+        # Pas d'images : Informations générales sur 2 colonnes pour un affichage plus dense
+        render_section('Informations générales')
+        fields = [c for c in df_sol.columns if c != solution_column and c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
+        selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:6], key='fields_solution')
+        
+        # Diviser les champs en deux groupes pour les deux colonnes
+        mid_point = (len(selected_fields) + 1) // 2
+        fields_left = selected_fields[:mid_point]
+        fields_right = selected_fields[mid_point:]
+        
+        col_info_left, col_info_right = st.columns([1, 1])
+        
+        # Conteneur professionnel pour les cartes avec transparence simple
+        cards_container_style = (
+            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+            'padding:20px 24px;margin-bottom:1.5rem;'
+            f'box-shadow:{THEME["glass_shadow"]};'
+            'transition:all 0.3s ease;'
+            'position:relative;'
+            'overflow:hidden;'
         )
         
-        # Nom de la solution centré
-        name_html = f'''
-        <div style="{name_style}">
-            <h2 style="font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;text-align:center;">{selected}</h2>
-        </div>
-        '''
-        
-        st.markdown(_wrap_html(name_html, 600), unsafe_allow_html=True)
-
-        # Section Images (si présentes) - Priorité visuelle
-        if has_images:
-            # Ligne séparatrice fine entre le nom/logo et les images
-            st.markdown(SEPARATOR, unsafe_allow_html=True)
+        # Colonne gauche des informations
+        with col_info_left:
+            cards_left = ''
+            for i, f in enumerate(fields_left):
+                val = info.get(f, 'N/A')
+                if pd.notna(val) and str(val).strip():
+                    card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
+                    card_style = (
+                        f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+                        'padding:14px 18px;margin:0 0 12px 0;width:100%;'
+                        f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
+                        'position:relative;overflow:hidden;'
+                    )
+                    cards_left += f'''<div style="{card_style}">
+                        <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
+                        <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
+                    </div>'''
             
-            render_section('Images')
-            render_image_section(images_urls, uploaded_image)
+            if cards_left:
+                grid_section_html_left = f'''<div style="{cards_container_style}">
+                    <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards_left}</div>
+                </div>'''
+                st.markdown(grid_section_html_left, unsafe_allow_html=True)
+        
+        # Colonne droite des informations
+        with col_info_right:
+            cards_right = ''
+            for i, f in enumerate(fields_right):
+                val = info.get(f, 'N/A')
+                if pd.notna(val) and str(val).strip():
+                    card_bg = THEME['glass_bg'] if (i + mid_point) % 2 == 0 else THEME['glass_bg_blue']
+                    card_style = (
+                        f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+                        'padding:14px 18px;margin:0 0 12px 0;width:100%;'
+                        f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
+                        'position:relative;overflow:hidden;'
+                    )
+                    cards_right += f'''<div style="{card_style}">
+                        <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
+                        <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
+                    </div>'''
+            
+            if cards_right:
+                grid_section_html_right = f'''<div style="{cards_container_style}">
+                    <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards_right}</div>
+                </div>'''
+                st.markdown(grid_section_html_right, unsafe_allow_html=True)
 
     # Sections techniques et localisation en pleine largeur sous les deux colonnes
     # Section Caractéristiques techniques
