@@ -20,7 +20,7 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 import io
 from app import utils
-from app.pages import home, comparatif, entreprise, alignement, solution
+from app.pages import analyse_comparative, home, entreprise, solution
 import sidebar  # votre sidebar.py à la racine
 
 # -----------------------------------------------------------------------------
@@ -129,10 +129,6 @@ df_comp, df_ent, df_align, df_sol = load_from_bytes(
 )
 
 
-#st.markdown("#### Colonnes de la feuille Analyse comparative :")
-#st.write(list(df_comp.columns))
-
-
 # -----------------------------------------------------------------------------
 # 7) Dispatch selon la page
 # -----------------------------------------------------------------------------
@@ -149,8 +145,10 @@ elif page == "Solution":
     else:
         st.error("Aucune donnée solution à afficher.")
 elif page == "Analyse comparative":
-    if df_align is not None and not df_align.empty:
-        alignement.display(df_align)
+    if df_comp is not None and not df_comp.empty:
+        # Créer un dictionnaire avec les DataFrames comme attendu par la nouvelle page
+        all_dfs = {"Analyse comparative": df_comp}
+        analyse_comparative.display(all_dfs)
     else:
         st.error("Aucune donnée d'analyse comparative à afficher.")
 

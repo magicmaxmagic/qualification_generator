@@ -1,3 +1,27 @@
+"""
+Page Solution - Application IVÉO BI
+===================================
+
+Cette page affiche les détails d'une solution sélectionnée avec une interface moderne, 
+compacte et harmonisée avec la charte graphique IVÉO.
+
+Fonctionnalités principales :
+- Affichage des informations de solution en colonnes adaptatives
+- Support multi-images avec persistance (URLs et uploads)
+- Gestion des images sauvegardées avec suppression individuelle
+- Design responsive et moderne
+- Sections techniques et de localisation
+
+Architecture du code :
+- Fonction display() principale refactorisée pour la maintenabilité
+- Fonctions helper spécialisées pour chaque fonctionnalité
+- Gestion d'erreurs et validation des données
+- Styles CSS intégrés et cohérents
+
+Auteurs : Équipe IVÉO
+Version : 3.0 (Refactorisée - 2025.01.10)
+"""
+
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
@@ -278,16 +302,16 @@ def render_image_section(images_urls: list, uploaded_images=None, saved_files_pa
         uploaded_images: Liste des fichiers images uploadés via Streamlit.
         saved_files_paths (list): Liste des chemins vers les images sauvegardées.
     """
-    # Vérifier s'il y a des images à afficher
-    has_url_images = images_urls and any(img.strip() for img in images_urls if isinstance(img, str) and img.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file'])
+    has_url_images = images_urls and any(
+        img.strip() for img in images_urls
+        if isinstance(img, str) and img.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file']
+    )
     has_uploaded_images = uploaded_images is not None and len(uploaded_images) > 0
     has_saved_images = saved_files_paths is not None and len(saved_files_paths) > 0
-    
-    # Si aucune image, ne pas afficher la section
+
     if not has_url_images and not has_uploaded_images and not has_saved_images:
         return
-    
-    # Conteneur pour les images - Version compacte
+
     images_style = (
         f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
         'padding:12px 16px;margin-bottom:1rem;'
@@ -296,8 +320,21 @@ def render_image_section(images_urls: list, uploaded_images=None, saved_files_pa
         'position:relative;'
         'overflow:hidden;'
     )
-    
-    # Générer les images URL
+
+    if has_url_images:
+        render_url_images(images_urls, images_style)
+    if has_uploaded_images:
+        render_uploaded_images(uploaded_images, images_style)
+    if has_saved_images:
+        render_saved_images(saved_files_paths, images_style)
+
+def render_url_images(images_urls: list, images_style: str):
+    """
+    Affiche les images depuis les URLs.
+    Args:
+        images_urls (list): Liste des URLs d'images
+        images_style (str): Style CSS pour les images
+    """
     images_html = ''
     for img_url in images_urls:
         if isinstance(img_url, str) and img_url.strip() and img_url.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file']:
@@ -308,8 +345,6 @@ def render_image_section(images_urls: list, uploaded_images=None, saved_files_pa
                     <img src="{img_url}" style="max-width:100%;max-height:300px;object-fit:contain;border-radius:8px;box-shadow:0 4px 15px rgba(0,114,178,0.15);border:1px solid rgba(0,114,178,0.1);" alt="Image solution"/>
                 </div>
                 '''
-    
-    # Afficher le conteneur HTML s'il y a des images URL
     if images_html:
         section_html = f'''
         <div style="{images_style}">
@@ -317,48 +352,54 @@ def render_image_section(images_urls: list, uploaded_images=None, saved_files_pa
         </div>
         '''
         st.markdown(section_html, unsafe_allow_html=True)
-    
-    # Afficher les images uploadées avec Streamlit dans un conteneur stylé compact
-    if has_uploaded_images:
-        for i, uploaded_image in enumerate(uploaded_images):
-            # Afficher l'image dans un conteneur avec bordure arrondie compacte
+
+def render_uploaded_images(uploaded_images: list, images_style: str):
+    """
+    Affiche les images uploadées.
+    Args:
+        uploaded_images (list): Liste des images uploadées
+        images_style (str): Style CSS pour les images
+    """
+    if not uploaded_images:
+        return
+    for uploaded_image in uploaded_images:
+        st.markdown(f'''
+        <div style="{images_style}">
+        ''', unsafe_allow_html=True)
+        _, col2, _ = st.columns([0.5, 4, 0.5])
+        with col2:
+            st.image(
+                uploaded_image,
+                use_container_width=True,
+                caption=f"Image: {uploaded_image.name}",
+                output_format="auto"
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def render_saved_images(saved_files_paths: list, images_style: str):
+    """
+    Affiche les images sauvegardées.
+    Args:
+        saved_files_paths (list): Liste des chemins des fichiers sauvegardés
+        images_style (str): Style CSS pour les images
+    """
+    if not saved_files_paths:
+        return
+    for filepath in saved_files_paths:
+        image_data = load_saved_image(filepath)
+        if image_data:
             st.markdown(f'''
             <div style="{images_style}">
             ''', unsafe_allow_html=True)
-            
-            # Utiliser des colonnes pour centrer l'image avec moins d'espace
             _, col2, _ = st.columns([0.5, 4, 0.5])
             with col2:
                 st.image(
-                    uploaded_image, 
-                    use_container_width=True, 
-                    caption=f"Image: {uploaded_image.name}",
+                    image_data,
+                    use_container_width=True,
+                    caption=f"Image sauvegardée: {Path(filepath).name}",
                     output_format="auto"
                 )
-            
             st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Afficher les images sauvegardées persistantes
-    if has_saved_images:
-        for i, filepath in enumerate(saved_files_paths):
-            image_data = load_saved_image(filepath)
-            if image_data:
-                # Afficher l'image dans un conteneur avec bordure arrondie compacte
-                st.markdown(f'''
-                <div style="{images_style}">
-                ''', unsafe_allow_html=True)
-                
-                # Utiliser des colonnes pour centrer l'image avec moins d'espace
-                _, col2, _ = st.columns([0.5, 4, 0.5])
-                with col2:
-                    st.image(
-                        image_data, 
-                        use_container_width=True, 
-                        caption=f"Image sauvegardée: {Path(filepath).name}",
-                        output_format="auto"
-                    )
-                
-                st.markdown('</div>', unsafe_allow_html=True)
 
 def render_section(title: str, bg: str = None):
     """
@@ -392,24 +433,19 @@ def render_section(title: str, bg: str = None):
     '''
     st.markdown(_wrap_html(section_html, 1000), unsafe_allow_html=True)
 
-def reset_section_counter():
-    """Réinitialise le compteur de section pour l'affichage harmonisé des titres de section."""
-    st.session_state['section_count'] = 0
+# --- Helper Functions for Display ---
 
-# --- Main Display ---
-def display(df_sol: pd.DataFrame):
-    # Appliquer les styles modernes à la sidebar
-    apply_sidebar_styles()
+def _validate_dataframe(df_sol: pd.DataFrame) -> tuple[bool, str]:
+    """
+    Valide le DataFrame et trouve la colonne solution.
     
-    # Réinitialiser le compteur de section à chaque affichage (avant tout appel à render_section)
-    reset_section_counter()
-    
-    # Vérifier si le DataFrame contient des données
+    Returns:
+        tuple: (is_valid, solution_column or error_message)
+    """
     if df_sol.empty:
-        st.error("Aucune donnée de solution disponible.")
-        return
+        return False, "Aucune donnée de solution disponible."
     
-    # Sidebar - Sélection de la solution
+    # Trouver la colonne solution
     solution_column = None
     for col in df_sol.columns:
         if 'solution' in col.lower():
@@ -417,26 +453,33 @@ def display(df_sol: pd.DataFrame):
             break
     
     if not solution_column:
-        st.error("Aucune colonne 'Solutions' trouvée dans les données.")
-        return
+        return False, "Aucune colonne 'Solutions' trouvée dans les données."
     
     solutions = df_sol[solution_column].dropna().unique()
     if len(solutions) == 0:
-        st.error("Aucune solution disponible dans les données.")
-        return
+        return False, "Aucune solution disponible dans les données."
     
+    return True, solution_column
+
+def _setup_sidebar_inputs(solutions: list) -> tuple[str, list, any]:
+    """
+    Configure les éléments d'entrée de la sidebar.
+    
+    Args:
+        solutions (list): Liste des solutions disponibles
+        
+    Returns:
+        tuple: (selected_solution, image_urls, uploaded_images)
+    """
+    # Sélection de la solution
     selected = st.sidebar.selectbox('Choisissez une solution', solutions, key='select_solution')
     cookies['solution_selected'] = json.dumps([selected])
-    info = df_sol[df_sol[solution_column] == selected].iloc[0]
-
-    # Couleur principale (retirée pour simplifier)
-    # color = st.sidebar.color_picker('Couleur principale', THEME['accent'])
     
-    # Champs pour ajouter plusieurs images
+    # Section d'ajout d'images
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Ajouter des images**")
     
-    # Option 1: Plusieurs URLs d'images
+    # URLs d'images
     st.sidebar.markdown("**URLs d'images**")
     num_urls = st.sidebar.number_input("Nombre d'URLs d'images", min_value=0, max_value=5, value=1, key='num_image_urls')
     
@@ -450,10 +493,10 @@ def display(df_sol: pd.DataFrame):
         if url and url.strip():
             image_urls.append(url.strip())
     
-    # Option 2: Plusieurs uploads d'images
+    # Upload d'images
     st.sidebar.markdown("**Télécharger des images**")
     
-    # Utiliser une clé dynamique pour forcer la réinitialisation du file_uploader
+    # Clé dynamique pour le file_uploader
     if 'file_uploader_key' not in st.session_state:
         st.session_state['file_uploader_key'] = 0
     
@@ -463,117 +506,467 @@ def display(df_sol: pd.DataFrame):
         accept_multiple_files=True,
         key=f'uploaded_images_{st.session_state["file_uploader_key"]}'
     )
+    
+    return selected, image_urls, uploaded_images
 
-    # Sauvegarder les images si nécessaire (seulement pour les URLs, pas pour les uploads)
+def _handle_image_persistence(selected: str, image_urls: list, uploaded_images: any) -> tuple[list, list]:
+    """
+    Gère la persistance des images (sauvegarde et récupération).
+    
+    Returns:
+        tuple: (persistent_urls, persistent_files)
+    """
+    # Sauvegarder les URLs
     if image_urls:
         save_persistent_images(selected, image_urls, None)
-
+    
     # Récupérer les images persistantes
     persistent_urls, persistent_files = get_persistent_images(selected)
     
-    # Sauvegarder les images uploadées seulement si elles ne sont pas déjà sauvegardées
+    # Sauvegarder les nouvelles images uploadées
     if uploaded_images:
-        # Vérifier si ces images ne sont pas déjà dans les fichiers persistants
         new_uploaded_images = []
         for uploaded_img in uploaded_images:
-            # Créer un hash pour cette image
             img_hash = hashlib.md5(uploaded_img.getvalue()).hexdigest()[:8]
-            # Vérifier si cette image existe déjà
-            exists = False
-            for persistent_file in persistent_files:
-                if img_hash in persistent_file:
-                    exists = True
-                    break
+            # Vérifier si l'image existe déjà
+            exists = any(img_hash in persistent_file for persistent_file in persistent_files)
             if not exists:
                 new_uploaded_images.append(uploaded_img)
         
         if new_uploaded_images:
             save_persistent_images(selected, [], new_uploaded_images)
-            # Recharger les images persistantes après sauvegarde
             persistent_urls, persistent_files = get_persistent_images(selected)
-            
-            # Forcer la réinitialisation du file_uploader après sauvegarde
+            # Réinitialiser le file_uploader
             st.session_state['file_uploader_key'] += 1
             st.rerun()
     
-    # Afficher les images persistantes dans la sidebar
-    if persistent_urls or persistent_files:
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("**Images sauvegardées**")
+    return persistent_urls, persistent_files
+
+def _render_url_deletion_buttons(persistent_urls: list, selected: str):
+    """
+    Affiche les boutons de suppression pour les URLs persistantes.
+    
+    Args:
+        persistent_urls (list): Liste des URLs persistantes
+        selected (str): Solution sélectionnée
+    """
+    if not persistent_urls:
+        return
         
-        # Afficher les URLs avec boutons de suppression individuels
-        if persistent_urls:
-            st.sidebar.markdown("**URLs sauvegardées:**")
-            for i, url in enumerate(persistent_urls):
-                col1, col2 = st.sidebar.columns([3, 1])
-                with col1:
-                    st.write(f"🔗 URL {i+1}")
-                with col2:
-                    if st.button("🗑️", key=f"delete_url_{i}", help="Supprimer cette URL"):
-                        # Supprimer cette URL spécifique
-                        updated_urls = [u for j, u in enumerate(persistent_urls) if j != i]
-                        cookie_key_urls = f"solution_images_urls_{selected}"
-                        cookies[cookie_key_urls] = json.dumps(updated_urls)
-                        st.sidebar.success("URL supprimée !")
-                        st.rerun()
+    st.sidebar.markdown("**URLs sauvegardées:**")
+    for i, url in enumerate(persistent_urls):
+        col1, col2 = st.sidebar.columns([3, 1])
+        with col1:
+            st.write(f"🔗 URL {i+1}")
+        with col2:
+            if st.button("🗑️", key=f"delete_url_{i}", help="Supprimer cette URL"):
+                updated_urls = [u for j, u in enumerate(persistent_urls) if j != i]
+                cookie_key_urls = f"solution_images_urls_{selected}"
+                cookies[cookie_key_urls] = json.dumps(updated_urls)
+                st.sidebar.success("URL supprimée !")
+                st.rerun()
+
+def _render_file_deletion_buttons(persistent_files: list, selected: str):
+    """
+    Affiche les boutons de suppression pour les fichiers persistants.
+    
+    Args:
+        persistent_files (list): Liste des fichiers persistants
+        selected (str): Solution sélectionnée
+    """
+    if not persistent_files:
+        return
         
-        # Afficher les fichiers avec boutons de suppression individuels
-        if persistent_files:
-            st.sidebar.markdown("**Fichiers sauvegardés:**")
-            for i, filepath in enumerate(persistent_files):
-                col1, col2 = st.sidebar.columns([3, 1])
-                with col1:
-                    filename = Path(filepath).name
-                    st.write(f"📁 {filename[:20]}...")
-                with col2:
-                    if st.button("🗑️", key=f"delete_file_{i}", help="Supprimer ce fichier"):
-                        # Supprimer le fichier physique
-                        try:
-                            full_path = Path(filepath)
-                            if full_path.exists():
-                                full_path.unlink()
-                        except Exception:
-                            pass
-                        
-                        # Supprimer ce fichier de la liste persistante
-                        updated_files = [f for j, f in enumerate(persistent_files) if j != i]
-                        cookie_key_files = f"solution_images_files_{selected}"
-                        cookies[cookie_key_files] = json.dumps(updated_files)
-                        
-                        # Forcer la réinitialisation du file_uploader pour éviter les conflits
-                        st.session_state['file_uploader_key'] += 1
-                        
-                        st.sidebar.success("Fichier supprimé !")
-                        st.rerun()
-        
-        st.sidebar.write(f"Total: {len(persistent_urls) + len(persistent_files)} image(s)")
-        
-        # Bouton pour nettoyer TOUTES les images persistantes
-        if st.sidebar.button("🗑️ Supprimer TOUTES les images sauvegardées"):
-            # Supprimer les fichiers physiques
-            for filepath in persistent_files:
+    st.sidebar.markdown("**Fichiers sauvegardés:**")
+    for i, filepath in enumerate(persistent_files):
+        col1, col2 = st.sidebar.columns([3, 1])
+        with col1:
+            filename = Path(filepath).name
+            st.write(f"📁 {filename[:20]}...")
+        with col2:
+            if st.button("🗑️", key=f"delete_file_{i}", help="Supprimer ce fichier"):
+                # Supprimer le fichier physique
                 try:
                     full_path = Path(filepath)
                     if full_path.exists():
                         full_path.unlink()
                 except Exception:
                     pass
-            
-            # Nettoyer les cookies
-            cookie_key_urls = f"solution_images_urls_{selected}"
-            cookie_key_files = f"solution_images_files_{selected}"
-            cookies[cookie_key_urls] = json.dumps([])
-            cookies[cookie_key_files] = json.dumps([])
-            
-            # Forcer la réinitialisation du file_uploader en changeant la clé
-            if 'file_uploader_key' not in st.session_state:
-                st.session_state['file_uploader_key'] = 0
-            st.session_state['file_uploader_key'] += 1
-            
-            st.sidebar.success("Toutes les images supprimées !")
-            st.rerun()
+                
+                # Supprimer de la liste persistante
+                updated_files = [f for j, f in enumerate(persistent_files) if j != i]
+                cookie_key_files = f"solution_images_files_{selected}"
+                cookies[cookie_key_files] = json.dumps(updated_files)
+                st.session_state['file_uploader_key'] += 1
+                st.sidebar.success("Fichier supprimé !")
+                st.rerun()
 
-    # Style CSS pour un rendu professionnel avec transparence simple
+def _render_global_deletion_button(persistent_urls: list, persistent_files: list, selected: str):
+    """
+    Affiche le bouton de suppression globale.
+    
+    Args:
+        persistent_urls (list): Liste des URLs persistantes
+        persistent_files (list): Liste des fichiers persistants
+        selected (str): Solution sélectionnée
+    """
+    if st.sidebar.button("🗑️ Supprimer TOUTES les images sauvegardées"):
+        # Supprimer tous les fichiers physiques
+        for filepath in persistent_files:
+            try:
+                full_path = Path(filepath)
+                if full_path.exists():
+                    full_path.unlink()
+            except Exception:
+                pass
+        
+        # Nettoyer les cookies
+        cookie_key_urls = f"solution_images_urls_{selected}"
+        cookie_key_files = f"solution_images_files_{selected}"
+        cookies[cookie_key_urls] = json.dumps([])
+        cookies[cookie_key_files] = json.dumps([])
+        st.session_state['file_uploader_key'] += 1
+        st.sidebar.success("Toutes les images supprimées !")
+        st.rerun()
+
+def _render_persistent_images_sidebar(selected: str, persistent_urls: list, persistent_files: list):
+    """
+    Affiche la section des images persistantes dans la sidebar avec boutons de suppression.
+    
+    Args:
+        selected (str): Solution sélectionnée
+        persistent_urls (list): Liste des URLs persistantes
+        persistent_files (list): Liste des fichiers persistants
+    """
+    if not persistent_urls and not persistent_files:
+        return
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Images sauvegardées**")
+    
+    # URLs avec suppression individuelle
+    _render_url_deletion_buttons(persistent_urls, selected)
+    
+    # Fichiers avec suppression individuelle
+    _render_file_deletion_buttons(persistent_files, selected)
+    
+    st.sidebar.write(f"Total: {len(persistent_urls) + len(persistent_files)} image(s)")
+    
+    # Bouton de suppression globale
+    _render_global_deletion_button(persistent_urls, persistent_files, selected)
+
+def _get_solution_urls(info: pd.Series) -> tuple[str, str]:
+    """
+    Extrait les URLs de site web et vidéo de la solution.
+    
+    Returns:
+        tuple: (url_site, video_url)
+    """
+    url_site = ''
+    for key in info.keys():
+        if 'site' in key.lower() and 'web' in key.lower():
+            val = info.get(key, '')
+            if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
+                url_site = val.strip()
+                break
+        if key.strip().lower() == 'website':
+            val = info.get(key, '')
+            if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
+                url_site = val.strip()
+                break
+    
+    video = info.get('URL (vidéo)', '')
+    return url_site, video
+
+def _get_description(info: pd.Series, df_sol: pd.DataFrame) -> str:
+    """
+    Récupère la description de la solution.
+    
+    Returns:
+        str: Description ou message par défaut
+    """
+    desc_column = None
+    for col in df_sol.columns:
+        if col.lower().startswith('description'):
+            desc_column = col
+            break
+    
+    desc = ''
+    if desc_column:
+        desc = info.get(desc_column, '')
+    
+    if not isinstance(desc, str) or not desc.strip():
+        desc = "Aucune description disponible."
+    
+    return desc
+
+def _collect_all_images(info: pd.Series, persistent_urls: list, image_urls: list) -> list:
+    """
+    Collecte toutes les URLs d'images de différentes sources.
+    
+    Returns:
+        list: Liste de toutes les URLs d'images
+    """
+    images_urls = []
+    
+    # Images des champs Excel
+    image_fields = [key for key in info.keys() if 'image' in key.lower() or 'photo' in key.lower() or 'screenshot' in key.lower()]
+    for field in image_fields:
+        img_url = info.get(field, '')
+        if isinstance(img_url, str) and img_url.strip():
+            images_urls.append(img_url.strip())
+    
+    # Images persistantes (URLs)
+    for url in persistent_urls:
+        if url and url.strip():
+            images_urls.append(url.strip())
+    
+    # Images personnalisées actuelles
+    for url in image_urls:
+        if url and url.strip():
+            images_urls.append(url.strip())
+    
+    return images_urls
+
+def _render_main_content(selected: str, info: pd.Series, desc: str, url_site: str, video: str, 
+                        images_urls: list, persistent_files: list, uploaded_images: any,
+                        df_sol: pd.DataFrame, solution_column: str):
+    """
+    Affiche le contenu principal de la page.
+    
+    Args:
+        selected (str): Solution sélectionnée
+        info (pd.Series): Données de la solution
+        desc (str): Description de la solution
+        url_site (str): URL du site web
+        video (str): URL de la vidéo
+        images_urls (list): Liste des URLs d'images
+        persistent_files (list): Liste des fichiers persistants
+        uploaded_images (any): Images uploadées
+        df_sol (pd.DataFrame): DataFrame des solutions
+        solution_column (str): Nom de la colonne solution
+    """
+    # Header
+    render_header('Fiche solution')
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+    
+    # Vérifier s'il y a des images
+    has_images = bool(images_urls) or bool(uploaded_images) or bool(persistent_files)
+    
+    # Section Description + Nom/Logo (2 colonnes)
+    col_left, col_right = st.columns([1, 1])
+    
+    with col_left:
+        render_section('Description')
+        desc_style = (
+            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+            'padding:20px 24px;margin-bottom:1.5rem;'
+            f'box-shadow:{THEME["glass_shadow"]};'
+            'transition:all 0.3s ease;position:relative;overflow:hidden;'
+        )
+        desc_html = f'''
+        <div style="{desc_style}">
+            <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
+        </div>
+        '''
+        st.markdown(desc_html, unsafe_allow_html=True)
+    
+    with col_right:
+        render_logo_and_name(selected, '', '#0072B2', url_site, video)
+    
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+    
+    # Section Informations + Images (adaptative)
+    if has_images:
+        _render_info_with_images(df_sol, solution_column, info, images_urls, persistent_files)
+    else:
+        _render_info_without_images(df_sol, solution_column, info)
+
+def _render_info_with_images(df_sol: pd.DataFrame, solution_column: str, info: pd.Series, 
+                           images_urls: list, persistent_files: list):
+    """
+    Affiche les informations avec images en deux colonnes.
+    
+    Args:
+        df_sol (pd.DataFrame): DataFrame des solutions
+        solution_column (str): Nom de la colonne solution
+        info (pd.Series): Données de la solution
+        images_urls (list): Liste des URLs d'images
+        persistent_files (list): Liste des fichiers persistants
+    """
+    col_left2, col_right2 = st.columns([1, 1])
+    
+    with col_left2:
+        render_section('Informations générales')
+        fields = [c for c in df_sol.columns if c != solution_column and 
+                 c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
+        selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_solution')
+        
+        _render_info_cards(selected_fields, info)
+    
+    with col_right2:
+        render_section('Images')
+        # Ne pas passer uploaded_images car elles sont déjà dans persistent_files
+        render_image_section(images_urls, None, persistent_files)
+
+def _render_info_without_images(df_sol: pd.DataFrame, solution_column: str, info: pd.Series):
+    """
+    Affiche les informations sans images sur 2 colonnes.
+    
+    Args:
+        df_sol (pd.DataFrame): DataFrame des solutions
+        solution_column (str): Nom de la colonne solution
+        info (pd.Series): Données de la solution
+    """
+    render_section('Informations générales')
+    fields = [c for c in df_sol.columns if c != solution_column and 
+             c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
+    selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:6], key='fields_solution')
+    
+    # Diviser en deux groupes
+    mid_point = (len(selected_fields) + 1) // 2
+    fields_left = selected_fields[:mid_point]
+    fields_right = selected_fields[mid_point:]
+    
+    col_info_left, col_info_right = st.columns([1, 1])
+    
+    with col_info_left:
+        _render_info_cards(fields_left, info)
+    
+    with col_info_right:
+        _render_info_cards(fields_right, info, start_index=mid_point)
+
+def _render_info_cards(fields: list, info: pd.Series, start_index: int = 0):
+    """
+    Affiche les cartes d'informations.
+    
+    Args:
+        fields (list): Liste des champs à afficher
+        info (pd.Series): Données de la solution
+        start_index (int): Index de départ pour l'alternance des couleurs
+    """
+    if not fields:
+        return
+        
+    cards_container_style = (
+        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+        'padding:20px 24px;margin-bottom:1.5rem;'
+        f'box-shadow:{THEME["glass_shadow"]};'
+        'transition:all 0.3s ease;position:relative;overflow:hidden;'
+    )
+    
+    cards = ''
+    for i, f in enumerate(fields):
+        val = info.get(f, 'N/A')
+        if pd.notna(val) and str(val).strip():
+            card_bg = THEME['glass_bg'] if (i + start_index) % 2 == 0 else THEME['glass_bg_blue']
+            card_style = (
+                f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+                'padding:14px 18px;margin:0 0 12px 0;width:100%;'
+                f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
+                'position:relative;overflow:hidden;'
+            )
+            cards += f'''<div style="{card_style}">
+                <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
+                <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
+            </div>'''
+    
+    if cards:
+        grid_section_html = f'''<div style="{cards_container_style}">
+            <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
+        </div>'''
+        st.markdown(grid_section_html, unsafe_allow_html=True)
+
+def _render_technical_section(info: pd.Series):
+    """
+    Affiche la section des caractéristiques techniques.
+    """
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+    render_section('Caractéristiques techniques')
+    
+    tech_fields = [key for key in info.keys() if any(word in key.lower() 
+                  for word in ['technologie', 'version', 'compatibilité', 'système', 'plateforme', 'api', 'technique', 'tech'])]
+    
+    if tech_fields:
+        tech_style = (
+            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+            'padding:20px 24px;margin-bottom:1.5rem;'
+            f'box-shadow:{THEME["glass_shadow"]};'
+            'transition:all 0.3s ease;position:relative;overflow:hidden;'
+        )
+        
+        tech_content = ''
+        for field in tech_fields[:3]:
+            val = info.get(field, 'N/A')
+            if pd.notna(val) and str(val).strip():
+                tech_content += f'<div style="margin-bottom:12px;"><strong style="color:{THEME["primary"]};font-size:0.9rem;">{field}:</strong> <span style="color:#000;font-size:0.9rem;">{val}</span></div>'
+        
+        if tech_content:
+            tech_html = f'<div style="{tech_style}">{tech_content}</div>'
+            st.markdown(tech_html, unsafe_allow_html=True)
+            return
+    
+    # Message par défaut si pas d'infos techniques
+    info_style = (
+        'background:rgba(227, 240, 250, 0.8);border:1px solid rgba(0, 114, 178, 0.3);border-radius:12px;'
+        'padding:16px 24px;margin-bottom:1.5rem;text-align:center;'
+        'box-shadow:0 4px 16px rgba(0, 114, 178, 0.1);'
+        'transition:all 0.3s ease;position:relative;overflow:hidden;'
+    )
+    info_html = f'''
+    <div style="{info_style}">
+        <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Aucune caractéristique technique spécifique disponible.</p>
+    </div>
+    '''
+    st.markdown(info_html, unsafe_allow_html=True)
+
+def _render_location_section(info: pd.Series):
+    """
+    Affiche la section de localisation si applicable.
+    """
+    location_fields = [key for key in info.keys() if any(word in key.lower() 
+                      for word in ['localisation', 'adresse', 'siège', 'address', 'location'])]
+    
+    if not location_fields:
+        return
+    
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+    render_section('Localisation')
+    
+    addr = info.get(location_fields[0], '')
+    if not isinstance(addr, str) or not addr.strip() or addr.strip().lower() in ['-', 'nan', 'aucun', 'none']:
+        return
+    
+    with st.spinner('Géocodage de l\'adresse en cours...'):
+        lat, lon = geocode(addr)
+    
+    if lat and lon:
+        df_map = pd.DataFrame([{'lat': lat, 'lon': lon, 'name': 'Localisation'}])
+        layer = pdk.Layer(
+            'ScatterplotLayer', df_map, get_position='[lon,lat]', get_radius=1000,
+            get_color=[0,114,178], pickable=True, tooltip=True
+        )
+        view = pdk.ViewState(latitude=lat, longitude=lon, zoom=7)
+        st.pydeck_chart(pdk.Deck(initial_view_state=view, layers=[layer], 
+                                tooltip={"text": "{name} : [{lat}, {lon}]"}), use_container_width=True)
+    else:
+        error_style = (
+            'background:rgba(248, 215, 218, 0.8);border:1px solid rgba(220, 53, 69, 0.4);border-radius:12px;'
+            'padding:16px 24px;margin-bottom:1.5rem;text-align:center;'
+            'box-shadow:0 4px 16px rgba(220, 53, 69, 0.15);'
+            'transition:all 0.3s ease;position:relative;overflow:hidden;'
+        )
+        error_html = f'''
+        <div style="{error_style}">
+            <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
+        </div>
+        '''
+        st.markdown(error_html, unsafe_allow_html=True)
+
+def _apply_page_styles():
+    """
+    Applique les styles CSS de la page.
+    """
     st.markdown("""
     <style>
     .main .block-container {
@@ -599,372 +992,73 @@ def display(df_sol: pd.DataFrame):
     }
     
     /* Transparence pour les éléments flottants */
-    .stSelectbox > div > div {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 12px rgba(255,255,255,0.08) !important;
-    }
-    
-    .stMultiSelect > div > div {
+    .stSelectbox > div > div, .stMultiSelect > div > div, .stColorPicker > div > div,
+    .stTextInput > div > div, .stFileUploader > div > div {
         background: rgba(255, 255, 255, 0.8) !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 8px !important;
         box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
     }
     
-    .stColorPicker > div > div {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
-    }
-    
-    .stTextInput > div > div {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
-    }
-    
-    .stFileUploader > div > div {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
-    }
-    
-    /* Sidebar avec transparence */
     .css-1d391kg {
         background: rgba(255, 255, 255, 0.85) !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Header en haut de la page
-    render_header('Fiche solution')
+# --- Main Display ---
+def display(df_sol: pd.DataFrame):
+    """
+    Fonction principale d'affichage de la page Solution, refactorisée pour une meilleure maintenabilité.
     
-    # Ligne séparatrice fine après le header
-    st.markdown(SEPARATOR, unsafe_allow_html=True)
-
-    # Vérifier s'il y a des images à afficher pour adapter la disposition
-    image_fields = [key for key in info.keys() if 'image' in key.lower() or 'photo' in key.lower() or 'screenshot' in key.lower()]
-    images_urls = []
+    Args:
+        df_sol (pd.DataFrame): DataFrame contenant les données des solutions
+    """
+    # Appliquer les styles modernes à la sidebar
+    apply_sidebar_styles()
     
-    # Ajouter les images des champs Excel
-    for field in image_fields:
-        img_url = info.get(field, '')
-        if isinstance(img_url, str) and img_url.strip():
-            images_urls.append(img_url.strip())
+    # Réinitialiser le compteur de section à chaque affichage
+    if 'section_count' not in st.session_state:
+        st.session_state['section_count'] = 0
+    st.session_state['section_count'] = 0
     
-    # Ajouter les images persistantes (URLs)
-    for url in persistent_urls:
-        if url and url.strip():
-            images_urls.append(url.strip())
+    # Appliquer les styles CSS de la page
+    _apply_page_styles()
     
-    # Ajouter les images personnalisées actuelles (URLs multiples)
-    for url in image_urls:
-        if url and url.strip():
-            images_urls.append(url.strip())
+    # Validation du DataFrame
+    is_valid, result = _validate_dataframe(df_sol)
+    if not is_valid:
+        st.error(result)
+        return
     
-    # Vérifier s'il y a des images (URLs + fichiers uploadés + fichiers persistants)
-    has_images = bool(images_urls) or bool(uploaded_images) or bool(persistent_files)
-
-    # Mise en page en deux colonnes : Description à gauche, Nom/Logo à droite
-    col_left, col_right = st.columns([1, 1])
+    solution_column = result
+    solutions = df_sol[solution_column].dropna().unique()
     
-    # Colonne gauche : Description
-    with col_left:
-        # Section Description avec transparence simple
-        render_section('Description')
-        
-        # Recherche de la colonne Description (commence par "Description")
-        desc_column = None
-        for col in df_sol.columns:
-            if col.lower().startswith('description'):
-                desc_column = col
-                break
-        
-        desc = ''
-        if desc_column:
-            desc = info.get(desc_column, '')
-        
-        if not isinstance(desc, str) or not desc.strip():
-            desc = "Aucune description disponible."
-        
-        # Section Description professionnelle avec transparence simple
-        desc_style = (
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-            'padding:20px 24px;margin-bottom:1.5rem;'
-            f'box-shadow:{THEME["glass_shadow"]};'
-            'transition:all 0.3s ease;'
-            'position:relative;'
-            'overflow:hidden;'
-        )
-        desc_html = f'''
-        <div style="{desc_style}">
-            <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
-        </div>
-        '''
-        st.markdown(desc_html, unsafe_allow_html=True)
+    # Configuration des éléments d'entrée de la sidebar
+    selected, image_urls, uploaded_images = _setup_sidebar_inputs(solutions)
     
-    # Colonne droite : Nom/Logo
-    with col_right:
-        # Récupérer les informations pour les boutons - même logique qu'entreprise.py
-        url_site = ''
-        for key in info.keys():
-            if 'site' in key.lower() and 'web' in key.lower():
-                val = info.get(key, '')
-                if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
-                    url_site = val.strip()
-                    break
-            if key.strip().lower() == 'website':
-                val = info.get(key, '')
-                if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
-                    url_site = val.strip()
-                    break
-        video = info.get('URL (vidéo)', '')
-        
-        # Utiliser render_logo_and_name sans logo (URL vide)
-        render_logo_and_name(selected, '', '#0072B2', url_site, video)
-
-    # Ligne séparatrice unique sur toute la largeur
-    st.markdown(SEPARATOR, unsafe_allow_html=True)
-
-    # Disposition adaptative des informations générales selon la présence d'images
-    if has_images:
-        # Mise en page en deux colonnes : Informations générales à gauche, Images à droite
-        col_left2, col_right2 = st.columns([1, 1])
-        
-        # Colonne gauche : Informations générales
-        with col_left2:
-            # Info Cards professionnelles avec transparence simple
-            render_section('Informations générales')
-            fields = [c for c in df_sol.columns if c != solution_column and c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
-            selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_solution')
-            
-            # Conteneur professionnel pour les cartes avec transparence simple
-            cards_container_style = (
-                f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-                'padding:20px 24px;margin-bottom:1.5rem;'
-                f'box-shadow:{THEME["glass_shadow"]};'
-                'transition:all 0.3s ease;'
-                'position:relative;'
-                'overflow:hidden;'
-            )
-            
-            cards = ''
-            for i, f in enumerate(selected_fields):
-                val = info.get(f, 'N/A')
-                if pd.notna(val) and str(val).strip():
-                    card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
-                    card_style = (
-                        f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-                        'padding:14px 18px;margin:0 0 12px 0;width:100%;'
-                        f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
-                        'position:relative;overflow:hidden;'
-                    )
-                    cards += f'''<div style="{card_style}">
-                        <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
-                        <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
-                    </div>'''
-            
-            if cards:
-                grid_section_html = f'''<div style="{cards_container_style}">
-                    <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
-                </div>'''
-                st.markdown(grid_section_html, unsafe_allow_html=True)
-        
-        # Colonne droite : Images
-        with col_right2:
-            render_section('Images')
-            # Ne pas passer uploaded_images car elles sont déjà sauvegardées dans persistent_files
-            render_image_section(images_urls, None, persistent_files)
-    else:
-        # Pas d'images : Informations générales sur 2 colonnes pour un affichage plus dense
-        render_section('Informations générales')
-        fields = [c for c in df_sol.columns if c != solution_column and c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
-        selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:6], key='fields_solution')
-        
-        # Diviser les champs en deux groupes pour les deux colonnes
-        mid_point = (len(selected_fields) + 1) // 2
-        fields_left = selected_fields[:mid_point]
-        fields_right = selected_fields[mid_point:]
-        
-        col_info_left, col_info_right = st.columns([1, 1])
-        
-        # Conteneur professionnel pour les cartes avec transparence simple
-        cards_container_style = (
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-            'padding:20px 24px;margin-bottom:1.5rem;'
-            f'box-shadow:{THEME["glass_shadow"]};'
-            'transition:all 0.3s ease;'
-            'position:relative;'
-            'overflow:hidden;'
-        )
-        
-        # Colonne gauche des informations
-        with col_info_left:
-            cards_left = ''
-            for i, f in enumerate(fields_left):
-                val = info.get(f, 'N/A')
-                if pd.notna(val) and str(val).strip():
-                    card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
-                    card_style = (
-                        f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-                        'padding:14px 18px;margin:0 0 12px 0;width:100%;'
-                        f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
-                        'position:relative;overflow:hidden;'
-                    )
-                    cards_left += f'''<div style="{card_style}">
-                        <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
-                        <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
-                    </div>'''
-            
-            if cards_left:
-                grid_section_html_left = f'''<div style="{cards_container_style}">
-                    <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards_left}</div>
-                </div>'''
-                st.markdown(grid_section_html_left, unsafe_allow_html=True)
-        
-        # Colonne droite des informations
-        with col_info_right:
-            cards_right = ''
-            for i, f in enumerate(fields_right):
-                val = info.get(f, 'N/A')
-                if pd.notna(val) and str(val).strip():
-                    card_bg = THEME['glass_bg'] if (i + mid_point) % 2 == 0 else THEME['glass_bg_blue']
-                    card_style = (
-                        f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-                        'padding:14px 18px;margin:0 0 12px 0;width:100%;'
-                        f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
-                        'position:relative;overflow:hidden;'
-                    )
-                    cards_right += f'''<div style="{card_style}">
-                        <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
-                        <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
-                    </div>'''
-            
-            if cards_right:
-                grid_section_html_right = f'''<div style="{cards_container_style}">
-                    <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards_right}</div>
-                </div>'''
-                st.markdown(grid_section_html_right, unsafe_allow_html=True)
-
-    # Sections techniques et localisation en pleine largeur sous les deux colonnes
-    # Section Caractéristiques techniques
-    st.markdown(SEPARATOR, unsafe_allow_html=True)
-    render_section('Caractéristiques techniques')
+    # Récupération des informations de la solution sélectionnée
+    info = df_sol[df_sol[solution_column] == selected].iloc[0]
+    cookies['solution_selected'] = json.dumps([selected])
     
-    # Vérifier s'il y a des informations techniques spécifiques à afficher
-    tech_fields = [key for key in info.keys() if any(word in key.lower() for word in ['technologie', 'version', 'compatibilité', 'système', 'plateforme', 'api', 'technique', 'tech'])]
+    # Gestion de la persistance des images
+    persistent_urls, persistent_files = _handle_image_persistence(selected, image_urls, uploaded_images)
     
-    if tech_fields:
-        tech_style = (
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-            'padding:20px 24px;margin-bottom:1.5rem;'
-            f'box-shadow:{THEME["glass_shadow"]};'
-            'transition:all 0.3s ease;'
-            'position:relative;'
-            'overflow:hidden;'
-        )
-        
-        tech_content = ''
-        for field in tech_fields[:3]:  # Limiter à 3 champs techniques
-            val = info.get(field, 'N/A')
-            if pd.notna(val) and str(val).strip():
-                tech_content += f'<div style="margin-bottom:12px;"><strong style="color:{THEME["primary"]};font-size:0.9rem;">{field}:</strong> <span style="color:#000;font-size:0.9rem;">{val}</span></div>'
-        
-        if tech_content:
-            tech_html = f'''
-            <div style="{tech_style}">
-                {tech_content}
-            </div>
-            '''
-            st.markdown(tech_html, unsafe_allow_html=True)
-        else:
-            # Message si pas d'informations techniques valides
-            info_style = (
-                'background:rgba(227, 240, 250, 0.8);border:1px solid rgba(0, 114, 178, 0.3);border-radius:12px;'
-                'padding:16px 24px;margin-bottom:1.5rem;text-align:center;'
-                'box-shadow:0 4px 16px rgba(0, 114, 178, 0.1);'
-                'transition:all 0.3s ease;'
-                'position:relative;'
-                'overflow:hidden;'
-            )
-            info_html = f'''
-            <div style="{info_style}">
-                <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Aucune caractéristique technique spécifique disponible.</p>
-            </div>
-            '''
-            st.markdown(info_html, unsafe_allow_html=True)
-    else:
-        # Message si pas d'informations techniques
-        info_style = (
-            'background:rgba(227, 240, 250, 0.8);border:1px solid rgba(0, 114, 178, 0.3);border-radius:12px;'
-            'padding:16px 24px;margin-bottom:1.5rem;text-align:center;'
-            'box-shadow:0 4px 16px rgba(0, 114, 178, 0.1);'
-            'transition:all 0.3s ease;'
-            'position:relative;'
-            'overflow:hidden;'
-        )
-        info_html = f'''
-        <div style="{info_style}">
-            <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Aucune caractéristique technique spécifique disponible.</p>
-        </div>
-        '''
-        st.markdown(info_html, unsafe_allow_html=True)
-
-    # Section Localisation (si des données de localisation existent)
-    location_fields = [key for key in info.keys() if any(word in key.lower() for word in ['localisation', 'adresse', 'siège', 'address', 'location'])]
+    # Affichage des images persistantes dans la sidebar
+    _render_persistent_images_sidebar(selected, persistent_urls, persistent_files)
     
-    if location_fields:
-        # Ligne séparatrice fine entre les caractéristiques techniques et la localisation
-        st.markdown(SEPARATOR, unsafe_allow_html=True)
-        
-        # Carte de localisation améliorée avec transparence simple
-        render_section('Localisation')
-        
-        # Prendre le premier champ de localisation trouvé
-        addr = info.get(location_fields[0], '')
-        
-        if isinstance(addr, str) and addr.strip() and addr.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
-            with st.spinner('Géocodage de l\'adresse en cours...'):
-                lat, lon = geocode(addr)
-            
-            if lat and lon:
-                df_map = pd.DataFrame([{'lat': lat, 'lon': lon, 'name': 'Localisation'}])
-                layer = pdk.Layer(
-                    'ScatterplotLayer',
-                    df_map,
-                    get_position='[lon,lat]',
-                    get_radius=1000,
-                    get_color=[0,114,178],
-                    pickable=True,
-                    tooltip=True
-                )
-                view = pdk.ViewState(latitude=lat, longitude=lon, zoom=7)
-                st.pydeck_chart(
-                    pdk.Deck(
-                        initial_view_state=view,
-                        layers=[layer],
-                        tooltip={"text": "{name} : [{lat}, {lon}]"}
-                    ),
-                    use_container_width=True
-                )
-            else:
-                # Message d'erreur dans un conteneur avec transparence simple
-                error_style = (
-                    'background:rgba(248, 215, 218, 0.8);border:1px solid rgba(220, 53, 69, 0.4);border-radius:12px;'
-                    'padding:16px 24px;margin-bottom:1.5rem;text-align:center;'
-                    'box-shadow:0 4px 16px rgba(220, 53, 69, 0.15);'
-                    'transition:all 0.3s ease;'
-                    'position:relative;'
-                    'overflow:hidden;'
-                )
-                error_html = f'''
-                <div style="{error_style}">
-                    <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
-                </div>
-                '''
-                st.markdown(error_html, unsafe_allow_html=True)
+    # Récupération des URLs et de la description
+    url_site, video = _get_solution_urls(info)
+    desc = _get_description(info, df_sol)
+    
+    # Collecte de toutes les images
+    images_urls = _collect_all_images(info, persistent_urls, image_urls)
+    
+    # Affichage du contenu principal
+    _render_main_content(selected, info, desc, url_site, video, 
+                        images_urls, persistent_files, uploaded_images,
+                        df_sol, solution_column)
+    
+    # Affichage des sections techniques et de localisation
+    _render_technical_section(info)
+    _render_location_section(info)
