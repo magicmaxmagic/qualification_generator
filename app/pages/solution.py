@@ -2,10 +2,143 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import json
+import os
+import hashlib
+import time
+from pathlib import Path
 from geopy.geocoders import Nominatim
 from sidebar import cookies, apply_sidebar_styles
 
 # Version: 2025.01.10 - Page Solution compacte avec gestion d'images - Design identique à Entreprise
+
+# --- Configuration pour la persistance des images ---
+UPLOAD_DIR = Path("uploads/user_images")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def save_uploaded_image(uploaded_file, solution_name):
+    """
+    Sauvegarde une image uploadée et retourne le chemin relatif.
+    Args:
+        uploaded_file: Fichier uploadé via Streamlit
+        solution_name: Nom de la solution pour organiser les fichiers
+    Returns:
+        str: Chemin relatif vers le fichier sauvegardé
+    """
+    if uploaded_file is None:
+        return None
+    
+    # Créer un hash unique basé sur le contenu et le nom du fichier
+    file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()[:8]
+    timestamp = int(time.time())
+    
+    # Nettoyer le nom de la solution pour le nom de fichier (enlever les caractères problématiques)
+    clean_solution_name = "".join(c for c in solution_name if c.isalnum() or c in ('-', '_')).rstrip()
+    clean_solution_name = clean_solution_name.replace(' ', '_')
+    # Éviter les noms vides
+    if not clean_solution_name:
+        clean_solution_name = "solution"
+    
+    # Extension du fichier (nettoyée)
+    file_extension = uploaded_file.name.split('.')[-1] if '.' in uploaded_file.name else 'jpg'
+    file_extension = "".join(c for c in file_extension if c.isalnum()).lower()
+    
+    # Nom du fichier final avec protection contre les doublons
+    base_filename = f"{clean_solution_name}_{file_hash}_{timestamp}"
+    filename = f"{base_filename}.{file_extension}"
+    filepath = UPLOAD_DIR / filename
+    
+    # Éviter les doublons en ajoutant un compteur si nécessaire
+    counter = 1
+    while filepath.exists():
+        filename = f"{base_filename}_{counter}.{file_extension}"
+        filepath = UPLOAD_DIR / filename
+        counter += 1
+    
+    # Sauvegarder le fichier
+    with open(filepath, "wb") as f:
+        f.write(uploaded_file.getvalue())
+    
+    # Retourner le chemin relatif de manière robuste
+    try:
+        # Utiliser os.path.relpath qui est plus robuste
+        return os.path.relpath(str(filepath), str(Path.cwd()))
+    except ValueError:
+        # Fallback : méthode string simple
+        return str(filepath).replace(str(Path.cwd()), "").lstrip("/\\")
+
+def load_saved_image(filepath):
+    """
+    Charge une image sauvegardée à partir de son chemin.
+    Args:
+        filepath: Chemin vers le fichier image
+    Returns:
+        bytes: Contenu de l'image ou None si erreur
+    """
+    try:
+        full_path = Path(filepath)
+        if full_path.exists():
+            with open(full_path, "rb") as f:
+                return f.read()
+    except Exception:
+        pass
+    return None
+
+def get_persistent_images(solution_name):
+    """
+    Récupère les images persistantes pour une solution depuis les cookies.
+    Args:
+        solution_name: Nom de la solution
+    Returns:
+        tuple: (urls_list, saved_files_paths_list)
+    """
+    cookie_key_urls = f"solution_images_urls_{solution_name}"
+    cookie_key_files = f"solution_images_files_{solution_name}"
+    
+    # Récupérer les URLs depuis les cookies
+    saved_urls_raw = cookies.get(cookie_key_urls)
+    saved_urls = json.loads(saved_urls_raw) if saved_urls_raw else []
+    
+    # Récupérer les chemins de fichiers depuis les cookies
+    saved_files_raw = cookies.get(cookie_key_files)
+    saved_files = json.loads(saved_files_raw) if saved_files_raw else []
+    
+    # Vérifier que les fichiers existent encore
+    valid_files = []
+    for filepath in saved_files:
+        if load_saved_image(filepath) is not None:
+            valid_files.append(filepath)
+    
+    return saved_urls, valid_files
+
+def save_persistent_images(solution_name, urls_list, uploaded_files):
+    """
+    Sauvegarde les images et leurs références dans les cookies.
+    Args:
+        solution_name: Nom de la solution
+        urls_list: Liste des URLs d'images
+        uploaded_files: Liste des fichiers uploadés
+    """
+    cookie_key_urls = f"solution_images_urls_{solution_name}"
+    cookie_key_files = f"solution_images_files_{solution_name}"
+    
+    # Sauvegarder les URLs
+    clean_urls = [url.strip() for url in urls_list if url and url.strip()]
+    cookies[cookie_key_urls] = json.dumps(clean_urls)
+    
+    # Sauvegarder les fichiers uploadés et stocker leurs chemins
+    saved_files = []
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            saved_path = save_uploaded_image(uploaded_file, solution_name)
+            if saved_path:
+                saved_files.append(saved_path)
+    
+    # Récupérer les anciens fichiers et les ajouter
+    _, old_files = get_persistent_images(solution_name)
+    all_files = list(set(old_files + saved_files))  # Éviter les doublons
+    
+    cookies[cookie_key_files] = json.dumps(all_files)
+
 # --- Visual Theme avec Transparence Simple ---
 THEME = {
     # Couleurs principales IVÉO
@@ -137,25 +270,27 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     
     st.markdown(_wrap_html(card, 600), unsafe_allow_html=True)
     
-def render_image_section(images_urls: list, uploaded_images=None):
+def render_image_section(images_urls: list, uploaded_images=None, saved_files_paths=None):
     """
-    Section d'affichage des images avec transparence simple.
+    Section d'affichage des images avec transparence simple et support des images persistantes.
     Args:
         images_urls (list): Liste des URLs d'images.
         uploaded_images: Liste des fichiers images uploadés via Streamlit.
+        saved_files_paths (list): Liste des chemins vers les images sauvegardées.
     """
     # Vérifier s'il y a des images à afficher
     has_url_images = images_urls and any(img.strip() for img in images_urls if isinstance(img, str) and img.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file'])
     has_uploaded_images = uploaded_images is not None and len(uploaded_images) > 0
+    has_saved_images = saved_files_paths is not None and len(saved_files_paths) > 0
     
     # Si aucune image, ne pas afficher la section
-    if not has_url_images and not has_uploaded_images:
+    if not has_url_images and not has_uploaded_images and not has_saved_images:
         return
     
-    # Conteneur pour les images
+    # Conteneur pour les images - Version compacte
     images_style = (
-        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-        'padding:20px 24px;margin-bottom:1.5rem;'
+        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+        'padding:12px 16px;margin-bottom:1rem;'
         f'box-shadow:{THEME["glass_shadow"]};'
         'transition:all 0.3s ease;'
         'position:relative;'
@@ -168,9 +303,9 @@ def render_image_section(images_urls: list, uploaded_images=None):
         if isinstance(img_url, str) and img_url.strip() and img_url.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file']:
             if img_url.startswith('http'):
                 images_html += f'''
-                <div style="margin-bottom:20px;text-align:center;">
-                    <div style="font-size:0.9rem;color:{THEME["primary"]};font-weight:600;margin-bottom:8px;">Image depuis URL</div>
-                    <img src="{img_url}" style="max-width:100%;max-height:400px;object-fit:contain;border-radius:12px;box-shadow:0 6px 20px rgba(0,114,178,0.2);border:2px solid rgba(0,114,178,0.1);" alt="Image solution"/>
+                <div style="margin-bottom:12px;text-align:center;">
+                    <div style="font-size:0.8rem;color:{THEME["primary"]};font-weight:600;margin-bottom:6px;">Image depuis URL</div>
+                    <img src="{img_url}" style="max-width:100%;max-height:300px;object-fit:contain;border-radius:8px;box-shadow:0 4px 15px rgba(0,114,178,0.15);border:1px solid rgba(0,114,178,0.1);" alt="Image solution"/>
                 </div>
                 '''
     
@@ -183,25 +318,47 @@ def render_image_section(images_urls: list, uploaded_images=None):
         '''
         st.markdown(section_html, unsafe_allow_html=True)
     
-    # Afficher les images uploadées avec Streamlit dans un conteneur stylé
+    # Afficher les images uploadées avec Streamlit dans un conteneur stylé compact
     if has_uploaded_images:
         for i, uploaded_image in enumerate(uploaded_images):
-            # Afficher l'image dans un conteneur avec bordure arrondie
+            # Afficher l'image dans un conteneur avec bordure arrondie compacte
             st.markdown(f'''
             <div style="{images_style}">
             ''', unsafe_allow_html=True)
             
-            # Utiliser des colonnes pour centrer l'image
-            _, col2, _ = st.columns([1, 3, 1])
+            # Utiliser des colonnes pour centrer l'image avec moins d'espace
+            _, col2, _ = st.columns([0.5, 4, 0.5])
             with col2:
                 st.image(
                     uploaded_image, 
                     use_container_width=True, 
-                    caption=f"Image uploadée: {uploaded_image.name}",
+                    caption=f"Image: {uploaded_image.name}",
                     output_format="auto"
                 )
             
             st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Afficher les images sauvegardées persistantes
+    if has_saved_images:
+        for i, filepath in enumerate(saved_files_paths):
+            image_data = load_saved_image(filepath)
+            if image_data:
+                # Afficher l'image dans un conteneur avec bordure arrondie compacte
+                st.markdown(f'''
+                <div style="{images_style}">
+                ''', unsafe_allow_html=True)
+                
+                # Utiliser des colonnes pour centrer l'image avec moins d'espace
+                _, col2, _ = st.columns([0.5, 4, 0.5])
+                with col2:
+                    st.image(
+                        image_data, 
+                        use_container_width=True, 
+                        caption=f"Image sauvegardée: {Path(filepath).name}",
+                        output_format="auto"
+                    )
+                
+                st.markdown('</div>', unsafe_allow_html=True)
 
 def render_section(title: str, bg: str = None):
     """
@@ -295,12 +452,126 @@ def display(df_sol: pd.DataFrame):
     
     # Option 2: Plusieurs uploads d'images
     st.sidebar.markdown("**Télécharger des images**")
+    
+    # Utiliser une clé dynamique pour forcer la réinitialisation du file_uploader
+    if 'file_uploader_key' not in st.session_state:
+        st.session_state['file_uploader_key'] = 0
+    
     uploaded_images = st.sidebar.file_uploader(
         "Sélectionner des images",
         type=['png', 'jpg', 'jpeg', 'gif', 'webp'],
         accept_multiple_files=True,
-        key='uploaded_images'
+        key=f'uploaded_images_{st.session_state["file_uploader_key"]}'
     )
+
+    # Sauvegarder les images si nécessaire (seulement pour les URLs, pas pour les uploads)
+    if image_urls:
+        save_persistent_images(selected, image_urls, None)
+
+    # Récupérer les images persistantes
+    persistent_urls, persistent_files = get_persistent_images(selected)
+    
+    # Sauvegarder les images uploadées seulement si elles ne sont pas déjà sauvegardées
+    if uploaded_images:
+        # Vérifier si ces images ne sont pas déjà dans les fichiers persistants
+        new_uploaded_images = []
+        for uploaded_img in uploaded_images:
+            # Créer un hash pour cette image
+            img_hash = hashlib.md5(uploaded_img.getvalue()).hexdigest()[:8]
+            # Vérifier si cette image existe déjà
+            exists = False
+            for persistent_file in persistent_files:
+                if img_hash in persistent_file:
+                    exists = True
+                    break
+            if not exists:
+                new_uploaded_images.append(uploaded_img)
+        
+        if new_uploaded_images:
+            save_persistent_images(selected, [], new_uploaded_images)
+            # Recharger les images persistantes après sauvegarde
+            persistent_urls, persistent_files = get_persistent_images(selected)
+            
+            # Forcer la réinitialisation du file_uploader après sauvegarde
+            st.session_state['file_uploader_key'] += 1
+            st.rerun()
+    
+    # Afficher les images persistantes dans la sidebar
+    if persistent_urls or persistent_files:
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("**Images sauvegardées**")
+        
+        # Afficher les URLs avec boutons de suppression individuels
+        if persistent_urls:
+            st.sidebar.markdown("**URLs sauvegardées:**")
+            for i, url in enumerate(persistent_urls):
+                col1, col2 = st.sidebar.columns([3, 1])
+                with col1:
+                    st.write(f"🔗 URL {i+1}")
+                with col2:
+                    if st.button("🗑️", key=f"delete_url_{i}", help="Supprimer cette URL"):
+                        # Supprimer cette URL spécifique
+                        updated_urls = [u for j, u in enumerate(persistent_urls) if j != i]
+                        cookie_key_urls = f"solution_images_urls_{selected}"
+                        cookies[cookie_key_urls] = json.dumps(updated_urls)
+                        st.sidebar.success("URL supprimée !")
+                        st.rerun()
+        
+        # Afficher les fichiers avec boutons de suppression individuels
+        if persistent_files:
+            st.sidebar.markdown("**Fichiers sauvegardés:**")
+            for i, filepath in enumerate(persistent_files):
+                col1, col2 = st.sidebar.columns([3, 1])
+                with col1:
+                    filename = Path(filepath).name
+                    st.write(f"📁 {filename[:20]}...")
+                with col2:
+                    if st.button("🗑️", key=f"delete_file_{i}", help="Supprimer ce fichier"):
+                        # Supprimer le fichier physique
+                        try:
+                            full_path = Path(filepath)
+                            if full_path.exists():
+                                full_path.unlink()
+                        except Exception:
+                            pass
+                        
+                        # Supprimer ce fichier de la liste persistante
+                        updated_files = [f for j, f in enumerate(persistent_files) if j != i]
+                        cookie_key_files = f"solution_images_files_{selected}"
+                        cookies[cookie_key_files] = json.dumps(updated_files)
+                        
+                        # Forcer la réinitialisation du file_uploader pour éviter les conflits
+                        st.session_state['file_uploader_key'] += 1
+                        
+                        st.sidebar.success("Fichier supprimé !")
+                        st.rerun()
+        
+        st.sidebar.write(f"Total: {len(persistent_urls) + len(persistent_files)} image(s)")
+        
+        # Bouton pour nettoyer TOUTES les images persistantes
+        if st.sidebar.button("🗑️ Supprimer TOUTES les images sauvegardées"):
+            # Supprimer les fichiers physiques
+            for filepath in persistent_files:
+                try:
+                    full_path = Path(filepath)
+                    if full_path.exists():
+                        full_path.unlink()
+                except Exception:
+                    pass
+            
+            # Nettoyer les cookies
+            cookie_key_urls = f"solution_images_urls_{selected}"
+            cookie_key_files = f"solution_images_files_{selected}"
+            cookies[cookie_key_urls] = json.dumps([])
+            cookies[cookie_key_files] = json.dumps([])
+            
+            # Forcer la réinitialisation du file_uploader en changeant la clé
+            if 'file_uploader_key' not in st.session_state:
+                st.session_state['file_uploader_key'] = 0
+            st.session_state['file_uploader_key'] += 1
+            
+            st.sidebar.success("Toutes les images supprimées !")
+            st.rerun()
 
     # Style CSS pour un rendu professionnel avec transparence simple
     st.markdown("""
@@ -386,17 +657,18 @@ def display(df_sol: pd.DataFrame):
         if isinstance(img_url, str) and img_url.strip():
             images_urls.append(img_url.strip())
     
-    # Ajouter les images personnalisées (URLs multiples)
+    # Ajouter les images persistantes (URLs)
+    for url in persistent_urls:
+        if url and url.strip():
+            images_urls.append(url.strip())
+    
+    # Ajouter les images personnalisées actuelles (URLs multiples)
     for url in image_urls:
         if url and url.strip():
             images_urls.append(url.strip())
     
-    # Ajouter les images uploadées si fournies
-    if uploaded_images:
-        for _ in uploaded_images:
-            images_urls.append('uploaded_file')
-    
-    has_images = bool(images_urls) or bool(uploaded_images)
+    # Vérifier s'il y a des images (URLs + fichiers uploadés + fichiers persistants)
+    has_images = bool(images_urls) or bool(uploaded_images) or bool(persistent_files)
 
     # Mise en page en deux colonnes : Description à gauche, Nom/Logo à droite
     col_left, col_right = st.columns([1, 1])
@@ -506,7 +778,8 @@ def display(df_sol: pd.DataFrame):
         # Colonne droite : Images
         with col_right2:
             render_section('Images')
-            render_image_section(images_urls, uploaded_images)
+            # Ne pas passer uploaded_images car elles sont déjà sauvegardées dans persistent_files
+            render_image_section(images_urls, None, persistent_files)
     else:
         # Pas d'images : Informations générales sur 2 colonnes pour un affichage plus dense
         render_section('Informations générales')
