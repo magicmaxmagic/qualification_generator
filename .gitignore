@@ -1,0 +1,253 @@
+# ================================
+# IVÉO BI - Fichiers à ignorer
+# ================================
+
+# =====================================
+# DONNÉES SENSIBLES ET CONFIDENTIELLES
+# =====================================
+# Dossier des fichiers téléchargés (données d'entreprises)
+uploads/
+uploads/*
+!uploads/.gitkeep
+
+# Fichiers Excel contenant des données sensibles
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+
+# Fichiers de données d'entreprises
+**/data/entreprises/
+**/data/confidential/
+**/data/clients/
+
+# Fichiers de configuration avec informations sensibles
+.env
+.env.local
+.env.production
+.env.development
+secrets/
+secrets/*
+credentials/
+credentials/*
+
+# Clés API et tokens
+*.key
+*.pem
+*.p12
+api_keys.txt
+tokens.json
+
+# ========================
+# ENVIRONNEMENT PYTHON
+# ========================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# ========================
+# STREAMLIT SPÉCIFIQUE
+# ========================
+# Cache Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Session state cache
+.streamlit/cache/
+
+# Logs Streamlit
+streamlit-*.log
+
+# ========================
+# OUTILS DE DÉVELOPPEMENT
+# ========================
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# VS Code
+.vscode/
+.history/
+
+# PyCharm
+.idea/
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# ========================
+# FICHIERS SYSTÈME
+# ========================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+desktop.ini
+
+# Linux
+*~
+
+# ========================
+# DOCKER
+# ========================
+# Docker volumes
+docker-volumes/
+.dockerignore.bak
+
+# ========================
+# LOGS ET DEBUGGING
+# ========================
+# Logs
+*.log
+*.out
+*.err
+logs/
+log/
+
+# Debug files
+*.dmp
+*.stackdump
+
+# ========================
+# BACKUPS ET TEMPORAIRES
+# ========================
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.swp
+*.tmp
+
+# Temporary directories
+tmp/
+temp/
+temporary/
+
+# ========================
+# DOCUMENTATION GÉNÉRÉE
+# ========================
+# Documentation auto-générée (garder les docs sources)
+docs/_build/
+docs/build/
+site/
+
+# ========================
+# AUTRES FICHIERS SENSIBLES
+# ========================
+# Fichiers de configuration personnalisés
+config/local.py
+settings/local.py
+local_settings.py
+
+# Fichiers de migration de données
+migrations/local/
+data_migration/
+
+# Archives et compressions contenant potentiellement des données sensibles
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# ========================
+# NOTES IMPORTANTES
+# ========================
+# Ce fichier .gitignore protège les données sensibles d'entreprises
+# et assure la conformité aux exigences de confidentialité du projet IVÉO BI.
+# 
+# Avant de modifier ce fichier, assurez-vous de comprendre les implications
+# de sécurité et de conformité réglementaire.
+#
+# Pour ajouter des exceptions, utilisez le préfixe ! suivi du chemin
+# Exemple: !uploads/sample_data.xlsx (pour inclure un fichier de test)
