@@ -4,3 +4,5 @@ openpyxl
 plotly
 geopy
 streamlit-cookies-manager
+streamlit-aggrid
+openai

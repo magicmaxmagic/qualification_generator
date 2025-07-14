@@ -20,7 +20,7 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 import io
 from app import utils
-from app.pages import analyse_comparative, home, entreprise, solution
+from app.pages import analyse_comparative, home, entreprise, solution, chatbot
 import sidebar  # votre sidebar.py à la racine
 
 # -----------------------------------------------------------------------------
@@ -114,7 +114,7 @@ with st.sidebar:
     st.markdown("---")
     page = st.radio(
         "Navigation",
-        ("Entreprise", "Solution", "Analyse comparative"),
+        ("Entreprise", "Solution", "Analyse comparative", "🤖 Assistant IA"),
         key="page_selector",
     )
 # -----------------------------------------------------------------------------
@@ -151,6 +151,15 @@ elif page == "Analyse comparative":
         analyse_comparative.display(all_dfs)
     else:
         st.error("Aucune donnée d'analyse comparative à afficher.")
+elif page == "🤖 Assistant IA":
+    # Créer un dictionnaire avec tous les DataFrames pour le chatbot
+    all_dfs = {
+        "Analyse comparative": df_comp,
+        "Entreprises": df_ent,
+        "Solutions": df_sol,
+        "Alignement": df_align
+    }
+    chatbot.display(all_dfs)
 
 # -----------------------------------------------------------------------------
 # 8 Sauvegarde **une seule fois** des cookies

@@ -16,6 +16,7 @@ Version : 2.0 - 2025.01.10
 """
 
 import streamlit as st
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 from sidebar import show_sidebar, show_sidebar_alignement, apply_sidebar_styles
 
@@ -203,160 +204,124 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
         df_filtered (pd.DataFrame): DataFrame filtré des données
         selected_entreprises (list): Liste des entreprises sélectionnées
     """
-    st.markdown("### Grille d'évaluation")    
-    # Créer une copie pour l'affichage
+    st.markdown("### Grille d'évaluation")
     df_display = df_filtered.copy()
-    
-    # Remplacer les valeurs 0/1 par des icônes pour les colonnes d'entreprises
-    def format_score(value):
-        """Convertit les scores 0/1 en icônes visuelles."""
+
+    def format_score_icons(value):
         str_value = str(value)
         if str_value in ["1", "1.0"]:
-            return "✅"
+            # Check moderne avec gradient vert
+            return "✓"
         elif str_value in ["0", "0.0"]:
-            return "❌"
+            # Croix moderne avec effet rouge
+            return "✕"
         else:
-            return str_value
-    
+            return "⚫"
+
     for col in selected_entreprises:
         if col in df_display.columns:
-            df_display[col] = df_display[col].apply(format_score)
-    
-    # Colonnes à afficher : Fonctionnalité, Description + entreprises sélectionnées
-    # Exclure Catégorie et Exigence (colonnes 0 et 2)
-    info_cols = [df_display.columns[1], df_display.columns[3]]  # Fonctionnalités et description
+            df_display[col] = df_display[col].apply(format_score_icons)
+
+    # Colonnes à afficher : Fonctionnalité + entreprises sélectionnées
+    info_cols = [df_display.columns[1]]  # Fonctionnalités uniquement
     columns_to_display = info_cols + selected_entreprises
-    
-    # Créer le tableau avec les colonnes demandées
     display_df = df_display[columns_to_display].copy()
-    
-    # Personnaliser les noms des colonnes
-    display_df.columns = [
-        COL_FONCTIONNALITE if col == COL_FONCTIONNALITES else
-        "Description" if col == COL_DESCRIPTION else
-        col for col in display_df.columns
-    ]
-    
-    # Afficher le tableau avec gestion des clics
-    event = st.dataframe(
-        display_df, 
-        use_container_width=True,
-        column_config={
-            **{col: st.column_config.TextColumn(
+    display_df.columns = [COL_FONCTIONNALITE if col == COL_FONCTIONNALITES else col for col in display_df.columns]
+
+    # Ajout colonne de sélection pour AgGrid (à gauche uniquement)
+    SELECTION_COL = "Sélection"
+    display_df.insert(0, SELECTION_COL, False)
+
+    gb = GridOptionsBuilder.from_dataframe(display_df)
+    gb.configure_selection(selection_mode="multiple", use_checkbox=True)
+    gb.configure_column(SELECTION_COL, header_name="", width=32, pinned=True, cellStyle={"textAlign": "center"})
+    # Largeur et alignement pour les autres colonnes
+    for col in display_df.columns:
+        if col != SELECTION_COL:
+            gb.configure_column(
                 col,
-                help=f"Cliquez pour voir les détails de {col}",
-                width="small"
-            ) for col in selected_entreprises},
-            COL_FONCTIONNALITE: st.column_config.TextColumn(
-                COL_FONCTIONNALITE,
-                width="medium"
-            ),
-            "Description": st.column_config.TextColumn(
-                "Description", 
-                width="medium"
+                width=120,
+                cellStyle={"textAlign": "center", "fontSize": "20px", "paddingTop": "8px"}
             )
+    # Hauteur des lignes
+    gb.configure_grid_options(rowHeight=50)
+    # Couleur header et alternance lignes
+    gb.configure_grid_options(headerHeight=45)
+    gb.configure_grid_options(
+        defaultColDef={
+            "headerClass": "custom-header"
+        }
+    )
+    grid_options = gb.build()
+
+    custom_css = {
+        ".ag-header-cell-label": {
+            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "font-weight": "bold",
+            "color": "#ffffff",
+            "border-bottom": "3px solid #4CAF50",
+            "justify-content": "center",
+            "text-shadow": "2px 2px 4px rgba(0,0,0,0.5)",
+            "border-radius": "8px 8px 0 0"
         },
-        hide_index=True,
-        height=800,
-        on_select="rerun",
-        selection_mode="single-row"
+        ".ag-header": {
+            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+        },
+        ".ag-cell": {
+            "border-right": "2px solid #e0e0e0",
+            "font-size": "22px",
+            "padding": "12px",
+            "background": "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
+            "box-shadow": "inset 0 1px 3px rgba(0,0,0,0.1)"
+        },
+        ".ag-row-even": {
+            "background": "linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%)"
+        },
+        ".ag-row-odd": {
+            "background": "linear-gradient(145deg, #ffffff 0%, #f1f3f4 100%)"
+        },
+        ".ag-row:hover": {
+            "background": "linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%) !important",
+            "transition": "all 0.3s ease",
+            "transform": "scale(1.02)",
+            "box-shadow": "0 4px 8px rgba(0,0,0,0.15)"
+        }
+    }
+
+    grid_response = AgGrid(
+        display_df,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        fit_columns_on_grid_load=True,
+        height=600,
+        allow_unsafe_jscode=True,
+        theme="balham",
+        custom_css=custom_css,
+        enable_enterprise_modules=True
     )
-    
-    # Gérer les clics sur les lignes pour afficher les détails
-    if event.selection and event.selection.get("rows"):
-        selected_row = event.selection["rows"][0]
-        
-        # Récupérer les données de la ligne sélectionnée
-        row_data = df_filtered.iloc[selected_row]
-        
-        # Afficher les détails avec sélecteur d'entreprise
+
+    selected_rows = grid_response["selected_rows"]
+    # Correction : conversion explicite si DataFrame
+    if isinstance(selected_rows, pd.DataFrame):
+        selected_rows = selected_rows.to_dict(orient="records")
+    # Afficher l'information complémentaire pour toutes les lignes sélectionnées
+    if selected_rows:
         st.markdown("---")
-        st.markdown("### Informations détaillées")
-        
-        # Ajouter un sélecteur d'entreprise
-        col1, col2 = st.columns([1, 3])
-        
-        with col1:
-            selected_entreprise = st.selectbox(
-                "Choisir une entreprise :",
-                options=selected_entreprises,
-                key=f"entreprise_selector_{selected_row}",
-                help="Sélectionnez l'entreprise pour voir ses informations complémentaires"
-            )
-        
-        with col2:
-            if selected_entreprise:
-                _show_detail_card(row_data, selected_entreprise, df_filtered)
-    
-    # Ajouter du CSS pour styliser le tableau
-    st.markdown(
-        """
-        <style>
-        .stDataFrame {
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            font-size: 16px;
-        }
-        .stDataFrame > div {
-            border-radius: 10px;
-        }
-        .stDataFrame [data-testid="stDataFrameResizeHandle"] {
-            display: none;
-        }
-        .stDataFrame table {
-            border-collapse: separate;
-            border-spacing: 0;
-            width: 80%;
-            margin: 0 auto;
-        }
-        .stDataFrame th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 600;
-            padding: 18px 8px;
-            text-align: center;
-            border: none;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            font-size: 16px;
-        }
-        .stDataFrame td {
-            padding: 16px 8px;
-            text-align: center;
-            border-bottom: 1px solid #f0f0f0;
-            border-right: 1px solid #f0f0f0;
-            font-size: 16px;
-            min-height: 60px;
-        }
-        .stDataFrame tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-        .stDataFrame tr:hover {
-            background-color: #e3f2fd;
-            transition: background-color 0.3s ease;
-        }
-        .stDataFrame td:first-child,
-        .stDataFrame td:nth-child(2) {
-            text-align: left;
-            font-weight: 500;
-            background-color: #fafafa;
-            padding: 16px 12px;
-        }
-        .stDataFrame tr:nth-child(even) td:first-child,
-        .stDataFrame tr:nth-child(even) td:nth-child(2) {
-            background-color: #f0f0f0;
-        }
-        /* Agrandir les icônes */
-        .stDataFrame td {
-            line-height: 1.8;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+        for row in selected_rows:
+            selected_fonctionnalite = row[COL_FONCTIONNALITE]
+            st.markdown(f"### Informations complémentaires pour : {selected_fonctionnalite}")
+            # Retrouver la ligne d'origine dans df_filtered
+            idx = df_filtered[df_filtered[COL_FONCTIONNALITES] == selected_fonctionnalite].index[0]
+            row_data = df_filtered.iloc[idx]
+            for entreprise in selected_entreprises:
+                info_complementaire = _get_info_complementaire(row_data, entreprise, df_filtered)
+                st.markdown(f"**{entreprise}** :")
+                if info_complementaire and info_complementaire.strip() != NO_INFO_MESSAGE:
+                    st.info(info_complementaire)
+                else:
+                    st.warning(NO_INFO_MESSAGE)
+
+    # (Bloc doublon supprimé : affichage déjà géré ci-dessus)
 
 
 def _show_detail_card(row_data, entreprise_name, df_filtered):
@@ -421,21 +386,21 @@ def _get_badge_info(score_numeric):
     if score_numeric == 1:
         return {
             "color": "#28a745",
-            "text": "✅",
+            "text": "🟢",
             "label": "Critère respecté",
             "card_color": "#d4edda"
         }
     elif score_numeric == 0:
         return {
             "color": "#dc3545",
-            "text": "❌",
+            "text": "🔴",
             "label": "Critère non respecté",
             "card_color": "#f8d7da"
         }
     else:
         return {
             "color": "#6c757d",
-            "text": "N/A",
+            "text": "⚪",
             "label": "Non évalué",
             "card_color": "#e2e3e5"
         }
