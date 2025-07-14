@@ -210,23 +210,39 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
     def format_score_icons(value):
         str_value = str(value)
         if str_value in ["1", "1.0"]:
-            # Check moderne avec gradient vert
-            return "✓"
+            return "✅"
         elif str_value in ["0", "0.0"]:
-            # Croix moderne avec effet rouge
-            return "✕"
+            return "❌"
+        elif str_value in ["0.5", "½"]:
+            return "⚠️"
         else:
-            return "⚫"
+            return "❓"
 
     for col in selected_entreprises:
         if col in df_display.columns:
             df_display[col] = df_display[col].apply(format_score_icons)
+
+    # --- Configuration AgGrid pour le rendu HTML des pastilles ---
+    from st_aggrid import JsCode
+    cell_renderer_js = JsCode("""
+        function(params) {
+            return params.value;
+        }
+    """)
 
     # Colonnes à afficher : Fonctionnalité + entreprises sélectionnées
     info_cols = [df_display.columns[1]]  # Fonctionnalités uniquement
     columns_to_display = info_cols + selected_entreprises
     display_df = df_display[columns_to_display].copy()
     display_df.columns = [COL_FONCTIONNALITE if col == COL_FONCTIONNALITES else col for col in display_df.columns]
+    # Affichage HTML pour les pastilles
+    st.markdown("""
+    <style>
+    .ag-cell span {
+        box-shadow: 0 2px 6px rgba(44,62,80,0.10);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     # Ajout colonne de sélection pour AgGrid (à gauche uniquement)
     SELECTION_COL = "Sélection"
@@ -235,14 +251,25 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_selection(selection_mode="multiple", use_checkbox=True)
     gb.configure_column(SELECTION_COL, header_name="", width=32, pinned=True, cellStyle={"textAlign": "center"})
-    # Largeur et alignement pour les autres colonnes
+    # Largeur, alignement et rendu HTML pour les colonnes entreprises
     for col in display_df.columns:
         if col != SELECTION_COL:
-            gb.configure_column(
-                col,
-                width=120,
-                cellStyle={"textAlign": "center", "fontSize": "20px", "paddingTop": "8px"}
-            )
+            if col in selected_entreprises:
+                gb.configure_column(
+                    col,
+                    width=120,
+                    cellStyle={"textAlign": "center", "fontSize": "20px", "paddingTop": "8px"},
+                    cellRenderer=cell_renderer_js,
+                    cellRendererParams={"innerRenderer": True},
+                    autoHeight=True,
+                    wrapText=True
+                )
+            else:
+                gb.configure_column(
+                    col,
+                    width=120,
+                    cellStyle={"textAlign": "center", "fontSize": "20px", "paddingTop": "8px"}
+                )
     # Hauteur des lignes
     gb.configure_grid_options(rowHeight=50)
     # Couleur header et alternance lignes
@@ -256,16 +283,20 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
 
     custom_css = {
         ".ag-header-cell-label": {
-            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            "font-weight": "bold",
-            "color": "#ffffff",
-            "border-bottom": "3px solid #4CAF50",
+            "background": "#2c3e50",
+            "font-weight": "600",
+            "color": "#f5f7fa",
+            "font-size": "1.15rem",
+            "border-bottom": "2px solid #2980b9",
             "justify-content": "center",
-            "text-shadow": "2px 2px 4px rgba(0,0,0,0.5)",
-            "border-radius": "8px 8px 0 0"
+            "align-items": "center",
+            "border-radius": "8px 8px 0 0",
+            "font-family": "'Segoe UI', 'Roboto', Arial, sans-serif"
         },
         ".ag-header": {
-            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+            "background": "#2c3e50",
+            "box-shadow": "0 2px 8px rgba(44,62,80,0.08)",
+            "border-radius": "8px 8px 0 0"
         },
         ".ag-cell": {
             "border-right": "2px solid #e0e0e0",
