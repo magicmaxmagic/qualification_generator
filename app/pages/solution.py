@@ -273,11 +273,11 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     # Conteneur du haut : Logo + Nom (seulement si logo présent) ou Nom seul
     if show_logo:
         top_container = f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><div style="flex-shrink:0;">{logo}</div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;">'
-        top_container += f'<h2 style="font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>'
+        top_container += f'<h2 style="font-size:1.7rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>'
         top_container += '</div></div>'
     else:
         # Nom seul, centré
-        top_container = f'<div style="display:flex;align-items:center;justify-content:center;"><h2 style="font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2></div>'
+        top_container = f'<div style="display:flex;align-items:center;justify-content:center;"><h2 style="font-size:1.7rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2></div>'
     
     # Conteneur du bas : Boutons
     bottom_container = f'<div style="display:flex;justify-content:center;width:100%;">{btns_html}</div>' if btns else ''
@@ -446,7 +446,7 @@ def render_section(title: str, bg: str = ""):
     
     section_html = f'''
     <div style="{section_style}">
-        <h3 style="margin:0;font-size:1.3rem;font-weight:700;color:#000;letter-spacing:-0.01em;">{title}</h3>
+        <h3 style="margin:0;font-size:1.6rem;font-weight:700;color:#000;letter-spacing:-0.01em;">{title}</h3>
     </div>
     '''
     st.markdown(_wrap_html(section_html, 1000), unsafe_allow_html=True)
@@ -781,7 +781,9 @@ def _render_info_with_images(df_sol: pd.DataFrame, solution_column: str, info: p
     with col_left2:
         render_section('Informations générales')
         fields = [c for c in df_sol.columns if c != solution_column and 
-                 c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
+                 c.lower() not in ['description','url (logo)','url (vidéo)','website','site web'] and
+                 not c.lower().startswith('description') and
+                 not c.lower().startswith('url')]
         selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_solution')
         
         _render_info_cards(selected_fields, info)
@@ -802,7 +804,9 @@ def _render_info_without_images(df_sol: pd.DataFrame, solution_column: str, info
     """
     render_section('Informations générales')
     fields = [c for c in df_sol.columns if c != solution_column and 
-             c.lower() not in ['description','url (logo)','url (vidéo)','website','site web']]
+             c.lower() not in ['description','url (logo)','url (vidéo)','website','site web'] and
+             not c.lower().startswith('description') and
+             not c.lower().startswith('url')]
     selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:6], key='fields_solution')
     
     # Diviser en deux groupes
@@ -849,8 +853,8 @@ def _render_info_cards(fields: list, info: pd.Series, start_index: int = 0):
                 'position:relative;overflow:hidden;'
             )
             cards += f'''<div style="{card_style}">
-                <strong style="font-size:0.85rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{f}</strong>
-                <div style="font-size:1.1rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
+                <strong style="font-size:1.0rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{f}</strong>
+                <div style="font-size:1.3rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
             </div>'''
     
     if cards:
@@ -877,7 +881,7 @@ def _render_description_section(desc: str):
     )
     desc_html = f'''
     <div style="{desc_style}">
-        <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
+        <div style="font-size:1.1rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
     </div>
     '''
     st.markdown(desc_html, unsafe_allow_html=True)
@@ -904,7 +908,7 @@ def _render_technical_section(info: pd.Series):
         for field in tech_fields[:3]:
             val = info.get(field, 'N/A')
             if pd.notna(val) and str(val).strip():
-                tech_content += f'<div style="margin-bottom:12px;"><strong style="color:{THEME["primary"]};font-size:0.9rem;">{field}:</strong> <span style="color:#000;font-size:0.9rem;">{val}</span></div>'
+                tech_content += f'<div style="margin-bottom:12px;"><strong style="color:{THEME["primary"]};font-size:1.0rem;">{field}:</strong> <span style="color:#000;font-size:1.0rem;">{val}</span></div>'
         
         if tech_content:
             tech_html = f'<div style="{tech_style}">{tech_content}</div>'
@@ -920,7 +924,7 @@ def _render_technical_section(info: pd.Series):
     )
     info_html = f'''
     <div style="{info_style}">
-        <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Aucune caractéristique technique spécifique disponible.</p>
+        <p style="margin:0;font-size:1.1rem;color:#000;font-weight:600;">Aucune caractéristique technique spécifique disponible.</p>
     </div>
     '''
     st.markdown(info_html, unsafe_allow_html=True)

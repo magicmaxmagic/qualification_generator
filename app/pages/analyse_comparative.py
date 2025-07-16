@@ -22,12 +22,12 @@ from sidebar import show_sidebar, show_sidebar_alignement, apply_sidebar_styles
 
 # Constantes
 NO_INFO_MESSAGE = "Aucune information complémentaire disponible"
-COL_FONCTIONNALITES = "Fonctionnalités"
-COL_FONCTIONNALITE = "Fonctionnalité"
-COL_CATEGORIES = "Catégories"
+COL_FONCTIONNALITES = "Type d'exigence"
+COL_CATEGORIES = "Domaine"
 COL_EXIGENCE = "Exigence différenciateur"
-COL_DESCRIPTION = "description"
+COL_DESCRIPTION = "Exigence"
 COL_INFO_COMP = "Information complémentaire"
+SELECTION_COL = "Sélection"
 
 
 def display(all_dfs):
@@ -55,13 +55,13 @@ def display(all_dfs):
         return
     
     # --- Interface utilisateur ---
-    selected_entreprises, selected_categories, selected_exigences = _setup_sidebar_controls(entreprise_cols, df_filtered)
+    selected_entreprises, selected_types_exigence, selected_categories, selected_exigences = _setup_sidebar_controls(entreprise_cols, df_filtered)
     if not selected_entreprises:
         st.warning("Veuillez sélectionner au moins une entreprise.")
         return
     
     # Filtrer les données selon les critères sélectionnés
-    df_filtered_criteria = _filter_data_by_criteria(df_filtered, selected_categories, selected_exigences)
+    df_filtered_criteria = _filter_data_by_criteria(df_filtered, selected_types_exigence, selected_categories, selected_exigences)
     if df_filtered_criteria is None or df_filtered_criteria.empty:
         st.warning("Aucune donnée ne correspond aux critères sélectionnés.")
         return
@@ -137,7 +137,7 @@ def _setup_sidebar_controls(entreprise_cols, df_filtered):
         df_filtered (pd.DataFrame): DataFrame filtré des données
         
     Returns:
-        tuple: (selected_entreprises, selected_categories, selected_exigences)
+        tuple: (selected_entreprises, selected_types_exigence, selected_categories, selected_exigences)
     """
     with st.sidebar:
         st.markdown("### Paramètres de comparaison")
@@ -153,6 +153,15 @@ def _setup_sidebar_controls(entreprise_cols, df_filtered):
         st.markdown("---")
         st.markdown("### Filtres")
         
+        # Filtre par type d'exigence
+        types_exigence_unique = df_filtered[COL_FONCTIONNALITES].dropna().unique()
+        selected_types_exigence = st.multiselect(
+            "Filtrer par type d'exigence :",
+            options=types_exigence_unique,
+            default=types_exigence_unique,
+            help="Sélectionnez les types d'exigence à afficher."
+        )
+        
         # Filtre par catégorie
         categories_unique = df_filtered[COL_CATEGORIES].dropna().unique()
         selected_categories = st.multiselect(
@@ -164,22 +173,40 @@ def _setup_sidebar_controls(entreprise_cols, df_filtered):
         
         # Filtre par exigence
         exigences_unique = df_filtered[COL_EXIGENCE].dropna().unique()
-        selected_exigences = st.multiselect(
-            "Filtrer par exigence :",
-            options=exigences_unique,
-            default=exigences_unique,
+        
+        # Transformer les valeurs 0 et 1 en "Non" et "Oui"
+        def transform_exigence_value(value):
+            if str(value) == "0" or str(value) == "0.0":
+                return "Non"
+            elif str(value) == "1" or str(value) == "1.0":
+                return "Oui"
+            else:
+                return str(value)
+        
+        # Créer un mapping pour les valeurs transformées
+        exigences_display = [transform_exigence_value(val) for val in exigences_unique]
+        exigences_mapping = dict(zip(exigences_display, exigences_unique))
+        
+        selected_exigences_display = st.multiselect(
+            "Filtrer par exigence différenciatrice :",
+            options=exigences_display,
+            default=exigences_display,
             help="Sélectionnez les niveaux d'exigence à afficher."
         )
+        
+        # Reconvertir les valeurs sélectionnées vers les valeurs originales
+        selected_exigences = [exigences_mapping[val] for val in selected_exigences_display]
     
-    return selected_entreprises, selected_categories, selected_exigences
+    return selected_entreprises, selected_types_exigence, selected_categories, selected_exigences
 
 
-def _filter_data_by_criteria(df_filtered, selected_categories, selected_exigences):
+def _filter_data_by_criteria(df_filtered, selected_types_exigence, selected_categories, selected_exigences):
     """
-    Filtre les données selon les catégories et exigences sélectionnées.
+    Filtre les données selon les types d'exigence, catégories et exigences sélectionnées.
     
     Args:
         df_filtered (pd.DataFrame): DataFrame filtré des données
+        selected_types_exigence (list): Liste des types d'exigence sélectionnés
         selected_categories (list): Liste des catégories sélectionnées
         selected_exigences (list): Liste des exigences sélectionnées
         
@@ -187,6 +214,9 @@ def _filter_data_by_criteria(df_filtered, selected_categories, selected_exigence
         pd.DataFrame: DataFrame filtré selon les critères
     """
     # Appliquer les filtres
+    if selected_types_exigence:
+        df_filtered = df_filtered[df_filtered[COL_FONCTIONNALITES].isin(selected_types_exigence)]
+    
     if selected_categories:
         df_filtered = df_filtered[df_filtered[COL_CATEGORIES].isin(selected_categories)]
     
@@ -242,10 +272,11 @@ def _format_scores_for_display(df_filtered, selected_entreprises):
 
 def _prepare_display_dataframe(df_display, selected_entreprises):
     """Prépare le DataFrame à afficher dans AgGrid."""
-    info_cols = [df_display.columns[1]]  # Fonctionnalités uniquement
+    # Utiliser la colonne COL_DESCRIPTION comme colonne principale
+    info_cols = [COL_DESCRIPTION]  # Utiliser la colonne "Exigence"
     columns_to_display = info_cols + selected_entreprises
     display_df = df_display[columns_to_display].copy()
-    display_df.columns = [COL_FONCTIONNALITE if col == COL_FONCTIONNALITES else col for col in display_df.columns]
+    # Les colonnes restent telles quelles
     st.markdown("""
     <style>
     .ag-cell span {
@@ -253,7 +284,6 @@ def _prepare_display_dataframe(df_display, selected_entreprises):
     }
     </style>
     """, unsafe_allow_html=True)
-    SELECTION_COL = "Sélection"
     display_df.insert(0, SELECTION_COL, False)
     return display_df
 
@@ -266,7 +296,6 @@ def _build_aggrid_options(display_df, selected_entreprises):
         }
     """)
     gb = GridOptionsBuilder.from_dataframe(display_df)
-    SELECTION_COL = "Sélection"
     gb.configure_selection(selection_mode="multiple", use_checkbox=True)
     gb.configure_column(SELECTION_COL, header_name="", width=32, pinned=True, cellStyle={"textAlign": "center"})
     for col in display_df.columns:
@@ -339,18 +368,36 @@ def _display_selected_infos(grid_response, df_filtered, selected_entreprises):
     selected_rows = grid_response["selected_rows"]
     if isinstance(selected_rows, pd.DataFrame):
         selected_rows = selected_rows.to_dict(orient="records")
-    if selected_rows:
-        st.markdown("---")
-        for row in selected_rows:
-            selected_fonctionnalite = row[COL_FONCTIONNALITE]
-            idx = df_filtered[df_filtered[COL_FONCTIONNALITES] == selected_fonctionnalite].index[0]
-            row_data = df_filtered.iloc[idx]
-            infos_to_display = _get_infos_to_display(row_data, selected_entreprises, df_filtered)
-            if infos_to_display:
-                st.markdown(f"### Informations complémentaires pour : {selected_fonctionnalite}")
-                for entreprise, info_complementaire in infos_to_display:
-                    st.markdown(f"**{entreprise}** :")
-                    st.info(info_complementaire)
+    
+    if not selected_rows:
+        return
+        
+    st.markdown("---")
+    for row in selected_rows:
+        # Récupérer l'exigence depuis la grille
+        selected_exigence = row.get(COL_DESCRIPTION)
+        
+        if selected_exigence is None:
+            st.warning("Impossible de récupérer l'exigence depuis la grille")
+            continue
+            
+        # Trouver la ligne correspondante dans le DataFrame original
+        matching_rows = df_filtered[df_filtered[COL_DESCRIPTION] == selected_exigence]
+        if matching_rows.empty:
+            st.warning(f"Aucune ligne trouvée pour l'exigence: {selected_exigence}")
+            continue
+            
+        idx = matching_rows.index[0]
+        row_data = df_filtered.iloc[idx]
+        infos_to_display = _get_infos_to_display(row_data, selected_entreprises, df_filtered)
+        
+        if infos_to_display:
+            st.markdown(f"### Informations complémentaires pour : {selected_exigence}")
+            for entreprise, info_complementaire in infos_to_display:
+                st.markdown(f"**{entreprise}** :")
+                st.info(info_complementaire)
+        else:
+            st.info(f"Aucune information complémentaire disponible pour : {selected_exigence}")
 
 def _get_infos_to_display(row_data, selected_entreprises, df_filtered):
     """Retourne la liste des tuples (entreprise, info_complementaire) à afficher."""
@@ -391,9 +438,9 @@ def _show_detail_card(row_data, entreprise_name, df_filtered):
         with col1:
             st.subheader(f"{entreprise_name}")
         with col2:
-            if badge_info["text"] == "✅":
+            if badge_info["text"] == "1":
                 st.success(badge_info["label"])
-            elif badge_info["text"] == "❌":
+            elif badge_info["text"] == "0":
                 st.error(badge_info["label"])
             else:
                 st.info(badge_info["label"])
@@ -424,21 +471,21 @@ def _get_badge_info(score_numeric):
     if score_numeric == 1:
         return {
             "color": "#28a745",
-            "text": "🟢",
+            "text": "1",
             "label": "Critère respecté",
             "card_color": "#d4edda"
         }
     elif score_numeric == 0:
         return {
             "color": "#dc3545",
-            "text": "🔴",
+            "text": "0",
             "label": "Critère non respecté",
             "card_color": "#f8d7da"
         }
     else:
         return {
             "color": "#6c757d",
-            "text": "⚪",
+            "text": "N/A",
             "label": "Non évalué",
             "card_color": "#e2e3e5"
         }

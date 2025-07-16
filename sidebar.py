@@ -530,12 +530,7 @@ def show_sidebar(
         previous = default or options[:1]
     
     # Section stylée avec icône contextuelle
-    if "données" in label.lower():
-        icon = "�"
-    elif "filtre" in label.lower():
-        icon = ""
-    else:
-        icon = ""
+    icon = ""
     create_sidebar_section(label, icon)
     
     # Ajout d'un indicateur de sélection
@@ -647,5 +642,162 @@ def show_sidebar_alignement(df_align) -> str:
     
     st.sidebar.markdown("</div>", unsafe_allow_html=True)
 
-    cookies[KEY] = sel
-    return sel
+    cookies[KEY] = sel if sel is not None else ""
+    return sel if sel is not None else ""
+
+def add_pdf_download_section(df_ent=None, df_sol=None, df_comp=None, df_align=None):
+    """
+    Ajoute une section pour télécharger le rapport PDF complet.
+    
+    Args:
+        df_ent: DataFrame des entreprises
+        df_sol: DataFrame des solutions
+        df_comp: DataFrame d'analyse comparative
+        df_align: DataFrame d'alignement
+    """
+    # Section stylée pour le téléchargement PDF - toujours affichée
+    st.sidebar.markdown("---")
+    create_sidebar_section("Export de rapport", "📄")
+    
+    try:
+        from app.pdf_generator_html import generate_report_with_export_options, create_download_link
+        from datetime import datetime
+        
+        # Informations sur le rapport - toujours affichées
+        st.sidebar.markdown("""
+        <div style="
+            background: rgba(248, 249, 250, 0.9);
+            border: 1px solid rgba(0, 114, 178, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            color: #0072B2;
+            font-size: 0.9rem;
+            font-weight: 500;
+        ">
+            Générez un rapport complet incluant toutes les analyses avec les filtres appliqués
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Boutons d'export
+        col1, col2 = st.sidebar.columns(2)
+        
+        with col1:
+            if st.button(
+                "📄 HTML",
+                key="generate_html_button",
+                help="Génère et télécharge le rapport HTML"
+            ):
+                with st.spinner("Génération du rapport HTML..."):
+                    try:
+                        reports = generate_report_with_export_options(df_ent, df_sol, df_comp, df_align)
+                        
+                        if reports["html"]:
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"rapport_iveo_{timestamp}.html"
+                            download_link = create_download_link(reports["html"], filename)
+                            st.success("✅ Rapport HTML généré!")
+                            st.markdown(download_link, unsafe_allow_html=True)
+                        else:
+                            st.error("❌ Erreur lors de la génération HTML")
+                    except Exception as e:
+                        st.error(f"❌ Erreur HTML: {str(e)}")
+        
+        with col2:
+            if st.button(
+                "📄 PDF",
+                key="generate_pdf_button",
+                help="Génère et télécharge le rapport PDF"
+            ):
+                with st.spinner("Génération du rapport PDF..."):
+                    try:
+                        reports = generate_report_with_export_options(df_ent, df_sol, df_comp, df_align)
+                        
+                        if reports["pdf"]:
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"rapport_iveo_{timestamp}.pdf"
+                            download_link = create_download_link(reports["pdf"], filename)
+                            st.success("✅ Rapport PDF généré!")
+                            st.markdown(download_link, unsafe_allow_html=True)
+                        else:
+                            st.error("❌ Erreur lors de la génération PDF")
+                            st.info("💡 Essayez l'export HTML puis convertissez avec votre navigateur")
+                    except Exception as e:
+                        st.error(f"❌ Erreur PDF: {str(e)}")
+                        st.info("💡 Essayez l'export HTML puis convertissez avec votre navigateur")
+    
+    except ImportError as e:
+        st.sidebar.error(f"❌ Module de rapport non disponible: {str(e)}")
+        st.sidebar.info("Le module de génération de rapport n'est pas accessible")
+        
+        # Afficher quand même les boutons d'information
+        if st.sidebar.button(
+            "ℹ️ À propos du rapport",
+            key="pdf_info_button_fallback",
+            help="Informations sur le rapport PDF"
+        ):
+            st.sidebar.markdown("""
+            <div style="
+                background: rgba(248, 249, 250, 0.9);
+                border: 1px solid rgba(0, 114, 178, 0.2);
+                border-radius: 8px;
+                padding: 12px 16px;
+                margin: 16px 0;
+                color: #333;
+                font-size: 0.85rem;
+                line-height: 1.4;
+            ">
+                La fonctionnalité d'export PDF est temporairement indisponible.<br>
+                Veuillez contacter l'administrateur pour résoudre ce problème.
+            </div>
+            """, unsafe_allow_html=True)
+    
+    except Exception as e:
+        st.sidebar.error(f"❌ Erreur: {str(e)}")
+        
+    # Bouton d'information - toujours affiché
+    if st.sidebar.button(
+        "ℹ️ À propos du rapport",
+        key="pdf_info_button",
+        help="Informations détaillées sur le contenu du rapport HTML"
+    ):
+        st.sidebar.markdown("""
+        <div style="
+            background: rgba(248, 249, 250, 0.9);
+            border: 1px solid rgba(0, 114, 178, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            color: #333;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        ">
+            <strong>Le rapport HTML inclut:</strong><br><br>
+            
+            <strong>1. Résumé exécutif</strong><br>
+            - Statistiques générales<br>
+            - Contexte de l'analyse<br><br>
+            
+            <strong>2. Analyse des entreprises</strong><br>
+            - Entreprises sélectionnées<br>
+            - Informations détaillées<br><br>
+            
+            <strong>3. Analyse des solutions</strong><br>
+            - Solutions évaluées<br>
+            - Caractéristiques techniques<br><br>
+            
+            <strong>4. Analyse comparative</strong><br>
+            - Critères d'évaluation<br>
+            - Filtres appliqués<br><br>
+            
+            <strong>5. Recommandations</strong><br>
+            - Conseils stratégiques<br>
+            - Prochaines étapes<br><br>
+            
+            <strong>6. Annexes</strong><br>
+            - Méthodologie<br>
+            - Glossaire<br><br>
+            
+            <strong>💡 Astuce:</strong> Pour convertir en PDF, ouvrez le fichier HTML dans votre navigateur et utilisez Ctrl+P → "Enregistrer en PDF"
+        </div>
+        """, unsafe_allow_html=True)

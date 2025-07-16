@@ -18,29 +18,18 @@ Version : 1.0 - 2025.01.16
 
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
 from io import BytesIO
 import base64
 from datetime import datetime
 import json
 from sidebar import cookies
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib import colors
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
-from pathlib import Path
-import requests
-from PIL import Image as PILImage
-import tempfile
-import os
-from cairosvg import svg2png
 
 
 # Couleurs IVÉO
@@ -117,40 +106,9 @@ class IVEOPDFGenerator:
     
     def _add_header(self):
         """Ajoute l'en-tête du rapport avec le logo IVÉO."""
-        try:
-            # Télécharger le logo IVÉO
-            logo_url = "https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg"
-            response = requests.get(logo_url)
-            
-            if response.status_code == 200:
-                # Créer un fichier temporaire pour le logo
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp_file:
-                    tmp_file.write(response.content)
-                    tmp_file_path = tmp_file.name
-                
-                # Convertir SVG en PNG pour ReportLab
-                try:
-                    png_data = svg2png(url=tmp_file_path)
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as png_file:
-                        png_file.write(png_data)
-                        png_file_path = png_file.name
-                    
-                    # Ajouter le logo au rapport
-                    logo = Image(png_file_path, width=2*inch, height=1*inch)
-                    logo.hAlign = 'CENTER'
-                    self.story.append(logo)
-                    
-                    # Nettoyer les fichiers temporaires
-                    os.unlink(tmp_file_path)
-                    os.unlink(png_file_path)
-                    
-                except ImportError:
-                    # Si cairosvg n'est pas disponible, utiliser un placeholder
-                    self.story.append(Paragraph("LOGO IVÉO", self.styles['IVEOTitle']))
-                    
-        except Exception:
-            # En cas d'erreur, utiliser un placeholder
-            self.story.append(Paragraph("IVÉO - Intelligence d'Affaires", self.styles['IVEOTitle']))
+        # Utiliser un header textuel simple pour éviter les problèmes d'images
+        self.story.append(Paragraph("IVÉO - Intelligence d'Affaires", self.styles['IVEOTitle']))
+        self.story.append(Spacer(1, 10))
         
         # Titre du rapport
         self.story.append(Paragraph("Rapport d'Analyse Comparative", self.styles['IVEOTitle']))
@@ -386,16 +344,17 @@ class IVEOPDFGenerator:
         # Tableau d'analyse comparative (premiers critères)
         if len(df_comp) > 0:
             # Prendre les premières colonnes importantes
-            comparison_data = [["Critère", "Description", "Priorité"]]
+            comparison_data = [["Type d'exigence", "Domaine", "Exigence différenciateur", "Exigence"]]
             
             for idx, row in df_comp.head(15).iterrows():  # Limiter à 15 critères
-                criterion = str(row.get("Fonctionnalité", "N/A"))[:40]
-                description = str(row.get("description", "N/A"))[:60]
-                priority = str(row.get("Exigence différenciateur", "N/A"))[:20]
+                type_exigence = str(row.get("Type d'exigence", "N/A"))[:30]
+                domaine = str(row.get("Domaine", "N/A"))[:30]
+                exigence_diff = str(row.get("Exigence différenciateur", "N/A"))[:20]
+                exigence = str(row.get("Exigence", "N/A"))[:40]
                 
-                comparison_data.append([criterion, description, priority])
+                comparison_data.append([type_exigence, domaine, exigence_diff, exigence])
             
-            comparison_table = Table(comparison_data, colWidths=[2*inch, 3*inch, 1*inch])
+            comparison_table = Table(comparison_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
             comparison_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), IVEO_BLUE),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),

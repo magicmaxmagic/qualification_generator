@@ -114,7 +114,7 @@ with st.sidebar:
     st.markdown("---")
     page = st.radio(
         "Navigation",
-        ("Entreprise", "Solution", "Analyse comparative", "🤖 Assistant IA"),
+        ("Entreprise", "Solution", "Analyse comparative", "Assistant IA"),
         key="page_selector",
     )
 # -----------------------------------------------------------------------------
@@ -127,10 +127,6 @@ def load_from_bytes(name: str, raw: bytes):
 df_comp, df_ent, df_align, df_sol = load_from_bytes(
     uploaded_file.name, uploaded_file.getvalue()
 )
-
-# Ajouter la section PDF téléchargement après le chargement des données
-with st.sidebar:
-    sidebar.add_pdf_download_section(df_ent, df_sol, df_comp, df_align)
 
 
 # -----------------------------------------------------------------------------
@@ -155,7 +151,7 @@ elif page == "Analyse comparative":
         analyse_comparative.display(all_dfs)
     else:
         st.error("Aucune donnée d'analyse comparative à afficher.")
-elif page == "🤖 Assistant IA":
+elif page == "Assistant IA":
     # Créer un dictionnaire avec tous les DataFrames pour le chatbot
     all_dfs = {
         "Analyse comparative": df_comp,
@@ -166,7 +162,14 @@ elif page == "🤖 Assistant IA":
     chatbot.display(all_dfs)
 
 # -----------------------------------------------------------------------------
-# 8 Sauvegarde **une seule fois** des cookies
+# 8) Section d'export PDF à la fin de la sidebar
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown("---")
+    sidebar.add_pdf_download_section(df_ent, df_sol, df_comp, df_align)
+
+# -----------------------------------------------------------------------------
+# 9) Sauvegarde **une seule fois** des cookies
 # -----------------------------------------------------------------------------
 if "cookies_saved" not in st.session_state:
     sidebar.cookies.save()

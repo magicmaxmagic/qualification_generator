@@ -77,7 +77,7 @@ def _render_header():
     st.markdown("### Assistant professionnel pour l'analyse de données")
 
 def _render_openai_unavailable(all_dfs):
-    st.warning("⚠️ **OpenAI temporairement non disponible** - Conflit de versions détecté")
+    st.warning("**OpenAI temporairement non disponible** - Conflit de versions détecté")
     st.markdown("""
     ### �️ **Solution rapide** :
     
@@ -101,11 +101,11 @@ def _render_openai_unavailable(all_dfs):
     ```
     """)
     st.markdown("---")
-    st.markdown("### 📊 **Aperçu de vos données en attendant** :")
+    st.markdown("### **Aperçu de vos données en attendant** :")
     if all_dfs:
         for sheet_name, df in all_dfs.items():
             if df is not None and not df.empty:
-                with st.expander(f"📈 {sheet_name} ({len(df)} lignes, {len(df.columns)} colonnes)"):
+                with st.expander(f"{sheet_name} ({len(df)} lignes, {len(df.columns)} colonnes)"):
                     st.dataframe(df.head())
     _render_temporary_interface(all_dfs)
 
@@ -231,9 +231,9 @@ def _setup_sidebar_chat(all_dfs):
         
         # Vérification de la connexion
         if init_openai():
-            st.success("✅ API OpenAI configurée")
+            st.success("API OpenAI configurée")
         else:
-            st.warning("⚠️ Clé API requise")
+            st.warning("Clé API requise")
         
         st.markdown("---")
         
@@ -283,7 +283,7 @@ def _setup_sidebar_chat(all_dfs):
             if quick_question and init_openai():
                 with st.spinner("Réflexion..."):
                     response = _get_ai_response(quick_question, all_dfs, is_quick=True)
-                    st.success(f"🤖: {response}")
+                    st.success(f": {response}")
             elif not init_openai():
                 st.error("Configurez d'abord votre clé API OpenAI")
         
@@ -342,7 +342,7 @@ def _render_main_chat():
         )
     
     with col2:
-        send_button = st.button("📤 Envoyer", key="main_send", use_container_width=True)
+        send_button = st.button("Envoyer", key="main_send", use_container_width=True)
     
     # Traitement de l'envoi
     if (send_button or user_input) and user_input:
@@ -356,7 +356,7 @@ def _render_main_chat():
         if not init_openai():
             st.session_state.chat_messages.append({
                 "role": "assistant",
-                "content": "⚠️ Veuillez configurer votre clé API OpenAI dans la sidebar.",
+                "content": "Veuillez configurer votre clé API OpenAI dans la sidebar.",
                 "timestamp": datetime.now().isoformat()
             })
             return
@@ -369,7 +369,7 @@ def _render_main_chat():
             "timestamp": datetime.now().isoformat()
         })
         # On ne fait st.rerun() que si la réponse n'est pas une erreur
-        if not ai_response.startswith("❌ Erreur") and not ai_response.startswith("⚠️ Veuillez"):
+        if ai_response is not None and not ai_response.startswith("Erreur") and not ai_response.startswith("Veuillez"):
             st.rerun()
 
 def _get_ai_response(user_message, all_dfs, is_quick=False):
@@ -385,7 +385,7 @@ def _get_ai_response(user_message, all_dfs, is_quick=False):
         str: Réponse de l'IA
     """
     if not OPENAI_AVAILABLE:
-        return "❌ OpenAI n'est pas disponible. Veuillez installer la librairie."
+        return "OpenAI n'est pas disponible. Veuillez installer la librairie."
         
     try:
         # Contexte système
@@ -410,11 +410,23 @@ def _get_ai_response(user_message, all_dfs, is_quick=False):
         
         # Appel à l'API OpenAI
         if openai_client is None:
-            return "❌ Client OpenAI non initialisé. Vérifiez votre clé API."
+            return "Client OpenAI non initialisé. Vérifiez votre clé API."
             
+        # Convertir les messages au format requis par OpenAI
+        formatted_messages = []
+        for msg in messages:
+            if msg["role"] == "system":
+                formatted_messages.append({"role": "system", "content": msg["content"]})
+            elif msg["role"] == "user":
+                formatted_messages.append({"role": "user", "content": msg["content"]})
+            elif msg["role"] == "assistant":
+                formatted_messages.append({"role": "assistant", "content": msg["content"]})
+            else:
+                formatted_messages.append({"role": "user", "content": msg["content"]})
+
         response = openai_client.chat.completions.create(
             model=st.session_state.get("selected_model", "gpt-3.5-turbo"),
-            messages=messages,
+            messages=formatted_messages,
             temperature=st.session_state.get("temperature", 0.7),
             max_tokens=st.session_state.get("max_tokens", 500)
         )
@@ -422,7 +434,7 @@ def _get_ai_response(user_message, all_dfs, is_quick=False):
         return response.choices[0].message.content
         
     except Exception as e:
-        return f"❌ Erreur lors de la communication avec l'IA : {str(e)}"
+        return f"Erreur lors de la communication avec l'IA : {str(e)}"
 
 def _build_system_context(all_dfs):
     """
@@ -474,6 +486,7 @@ def _build_system_context(all_dfs):
 
 def _add_system_message(action_description, all_dfs):
     """Ajoute un message système basé sur une action rapide."""
+    message = "Action non reconnue."
     if action_description == "Analyse des données en cours...":
         message = "Analyse des données effectuée. Voici un résumé :\n\n"
         if all_dfs:

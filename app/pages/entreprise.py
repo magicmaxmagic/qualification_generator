@@ -129,7 +129,7 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     
     # Conteneur du haut : Logo + Nom (alignement centré avec gap réduit)
     top_container = f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><div style="flex-shrink:0;">{logo}</div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;">'
-    top_container += f'<h2 style="font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>'
+    top_container += f'<h2 style="font-size:1.7rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>'
     top_container += '</div></div>'
     
     # Conteneur du bas : Boutons
@@ -168,7 +168,7 @@ def render_section(title: str, bg: Optional[str] = None):
     
     section_html = f'''
     <div style="{section_style}">
-        <h3 style="margin:0;font-size:1.3rem;font-weight:700;color:#000;letter-spacing:-0.01em;">{title}</h3>
+        <h3 style="margin:0;font-size:1.6rem;font-weight:700;color:#000;letter-spacing:-0.01em;">{title}</h3>
     </div>
     '''
     st.markdown(_wrap_html(section_html, 1000), unsafe_allow_html=True)
@@ -186,7 +186,6 @@ def is_valid_logo(logo_img):
     
     # Accepter les images binaires (bytes) extraites d'Excel
     if isinstance(logo_img, bytes):
-        st.sidebar.write("Image binaire valide détectée")
         return True
     
     # Convertir en string pour vérification
@@ -194,17 +193,14 @@ def is_valid_logo(logo_img):
     
     # Exclure les chaînes d'erreur Excel ou vides
     if str_val.lower() in ['#value!', '#name?', '#ref!', '#div/0!', '#num!', '#null!', 'nan', '']:
-        st.sidebar.write(f"Erreur Excel ignorée: {str_val}")
         return False
     
     # Accepter les liens SharePoint ou chemins Windows
     if str_val.startswith(('https://', 'http://', 'C:\\')):
-        st.sidebar.write(f"Lien valide détecté: {str_val}")
         return True
     
     # Exclure les valeurs numériques simples (0, 1, etc.)
     if str_val.isdigit():
-        st.sidebar.write(f"Valeur numérique ignorée: {str_val}")
         return False
     
     # Accepter toute autre valeur string non vide
@@ -220,38 +216,30 @@ def download_and_display_image(url):
         # Si c'est un lien de partage SharePoint, on le transforme en lien de téléchargement direct
         if 'sharepoint.com' in url and '?e=' in url:
             download_url = url + '&download=1'
-            st.sidebar.write(f"URL SharePoint transformée en: {download_url}")
         
-        st.sidebar.write(f"Tentative de téléchargement depuis : {download_url}")
         # Certains liens SharePoint nécessitent un user-agent pour fonctionner
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
         response = requests.get(download_url, headers=headers, stream=True, timeout=10)
         
         content_type = response.headers.get('Content-Type', '')
         if response.status_code == 200 and 'image' in content_type:
-            st.sidebar.write("Téléchargement réussi, affichage de l'image.")
             image_bytes = io.BytesIO(response.content)
             st.image(image_bytes, width=150, caption=LOGO_CAPTION)
             return True
         else:
-            st.sidebar.write(f"Échec du téléchargement direct. Status: {response.status_code}, Content-Type: {response.headers.get('Content-Type')}")
             return False
     except requests.exceptions.RequestException as e:
-        st.sidebar.write(f"Erreur lors du téléchargement de l'image : {e}")
         return False
 
 def try_display_image(img_src):
-    st.sidebar.write(f"Tentative d'affichage image pour : {img_src}")
     
     if 'sharepoint.com' in str(img_src):
-        st.sidebar.write("Détection lien SharePoint. Tentative de téléchargement.")
         
         # Tenter de télécharger et d'afficher l'image
         if download_and_display_image(img_src):
             return True
         
         # Si le téléchargement échoue, afficher le lien cliquable comme solution de secours
-        st.sidebar.write("Le téléchargement a échoué. Affichage du lien cliquable comme solution de secours.")
         try:
             st.markdown(f'''
                 <div style="border:1px solid #ddd; border-radius:8px; padding:15px; text-align:center; background-color:#f9f9f9; margin-top: 10px;">
@@ -263,14 +251,11 @@ def try_display_image(img_src):
             ''', unsafe_allow_html=True)
             return True
         except Exception as e:
-            st.sidebar.write(f"Erreur lors de l'affichage du lien cliquable de secours: {e}")
             return False
     try:
         st.image(img_src, width=120, caption=LOGO_CAPTION, use_container_width=False)
-        st.sidebar.write("Image standard affichée avec succès.")
         return True
     except Exception as e:
-        st.sidebar.write(f"Erreur image standard: {e}")
         return False
 
 def extract_url_from_text(text):
@@ -283,62 +268,47 @@ def extract_url_from_text(text):
         url_match = re.search(pattern, text)
         if url_match:
             url = url_match.group()
-            st.sidebar.write(f"URL/Chemin extrait: {url}")
             return url
     return None
 
 def display_logo_from_str(logo_str):
-    st.sidebar.write(f"Traitement string: {logo_str}")
     if logo_str.startswith(('https://', 'http://', 'C:\\')):
-        st.sidebar.write("Cas 1: Lien direct ou chemin")
         return try_display_image(logo_str)
     if 'http' in logo_str.lower():
-        st.sidebar.write("Cas 2: Texte contenant URL")
         extracted_url = extract_url_from_text(logo_str)
         if extracted_url:
             return try_display_image(extracted_url)
-    st.sidebar.write("Aucun cas de traitement de string trouvé")
     return False
 
 def display_logo_from_object(logo_img):
     if isinstance(logo_img, bytes):
-        st.sidebar.write("Image bytes détectée (extraite d'Excel)")
         try:
             st.image(logo_img, width=150, caption=LOGO_CAPTION)
-            st.sidebar.write("Affichage image bytes réussi")
             return True
         except Exception as e:
-            st.sidebar.write(f"Erreur affichage image bytes: {e}")
             return False
     
     # Cas 2: Objet avec méthode read() (file-like object)
     if hasattr(logo_img, 'read'):
-        st.sidebar.write("Objet file-like détecté")
         return try_display_image(logo_img)
     
     # Cas 3: Bytearray
     if isinstance(logo_img, bytearray):
-        st.sidebar.write("Bytearray détecté")
         return try_display_image(logo_img)
     
     # Cas 4: PIL Image (si disponible)
     try:
         from PIL import Image
         if isinstance(logo_img, Image.Image):
-            st.sidebar.write("PIL Image détecté")
             return try_display_image(logo_img)
     except ImportError:
-        st.sidebar.write("PIL/Pillow non installé, impossible de traiter l'objet PIL.")
+        pass
     
-    st.sidebar.write("Aucun type d'objet image reconnu")
     return False
 
 def display_logo(logo_img):
-    st.sidebar.write(f"Vérification validité logo: {logo_img} (type: {type(logo_img)})")
-    
     # D'abord, vérifier si c'est une image binaire (bytes) extraite d'Excel
     if isinstance(logo_img, bytes):
-        st.sidebar.write("Image binaire détectée - traitement direct")
         return display_logo_from_object(logo_img)
     
     # Ensuite, traiter comme une chaîne de caractères (URL, chemin, etc.)
@@ -346,15 +316,12 @@ def display_logo(logo_img):
     
     # Ignorer complètement les erreurs Excel
     if logo_str in ['#VALUE!', '#NAME?', '#REF!', '#DIV/0!', '#NUM!', '#NULL!']:
-        st.sidebar.write(f"Erreur Excel ignorée: {logo_str}")
         return False
     
     if logo_str.isdigit() and logo_str in ['0', '1']:
-        st.sidebar.write(f"Valeur numérique simple ignorée: {logo_str}")
         return False
     
     if not is_valid_logo(logo_img):
-        st.sidebar.write("Logo invalide ou vide")
         return False
     
     if display_logo_from_str(logo_str):
@@ -394,8 +361,8 @@ def render_left_column(info, selected_fields):
             'position:relative;overflow:hidden;'
         )
         cards += f'''<div style="{card_style}">
-            <strong style="font-size:0.85rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{f}</strong>
-            <div style="font-size:1.1rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
+            <strong style="font-size:1.0rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{f}</strong>
+            <div style="font-size:1.3rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
         </div>'''
     grid_section_html = f'''<div style="{cards_container_style}">
         <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
@@ -420,10 +387,6 @@ def get_url_site(info):
 def render_logo_section(selected, info, color, url_site, video):
     logo_img = info.get('Logo', None)
     
-    # Debugging initial
-    st.sidebar.write(f"--- Debug Logo pour {selected} ---")
-    st.sidebar.write(f"Valeur brute: {repr(logo_img)}")
-
     logo_displayed = display_logo(logo_img)
 
     if logo_displayed:
@@ -432,7 +395,6 @@ def render_logo_section(selected, info, color, url_site, video):
             unsafe_allow_html=True
         )
     else:
-        st.sidebar.write("Affichage du logo de secours (render_logo_and_name)")
         render_logo_and_name(selected, info.get('URL (logo)', ''), color, url_site, video)
 
 def render_description_section(info):
@@ -450,32 +412,121 @@ def render_description_section(info):
     )
     desc_html = f'''
     <div style="{desc_style}">
-        <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
+        <div style="font-size:1.1rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
     </div>
     '''
     st.markdown(desc_html, unsafe_allow_html=True)
 
 def render_map_section(info):
     render_section('Localisation')
-    addr = info.get('Localisation (Siège social)', '')
-    with st.spinner('Géocodage de l\'adresse en cours...'):
-        lat, lon = geocode(addr)
-    if lat and lon:
-        df_map = pd.DataFrame([{'lat': lat, 'lon': lon, 'name': 'Siège'}])
+    
+    # Trouver toutes les colonnes qui commencent par "localisation" ou "Localisation"
+    location_columns = [col for col in info.index if col.lower().startswith('localisation')]
+    
+    # Si aucune colonne trouvée, essayer quelques variantes communes
+    if not location_columns:
+        # Chercher des colonnes avec "localisation" n'importe où dans le nom
+        location_columns = [col for col in info.index if 'localisation' in col.lower()]
+    
+    # Si toujours aucune colonne, utiliser l'ancienne méthode avec une colonne spécifique
+    if not location_columns:
+        # Fallback vers la méthode originale
+        addr = info.get('Localisation (Siège social)', '')
+        if addr and str(addr).strip() and str(addr).strip().lower() != 'nan':
+            with st.spinner('Géocodage de l\'adresse en cours...'):
+                lat, lon = geocode(str(addr))
+                if lat and lon:
+                    df_map = pd.DataFrame([{'lat': lat, 'lon': lon, 'name': 'Siège social', 'address': str(addr)}])
+                    layer = pdk.Layer(
+                        'ScatterplotLayer',
+                        df_map,
+                        get_position='[lon,lat]',
+                        get_radius=8000,  # Rayon fixe plus grand
+                        get_color=[0,114,178],
+                        pickable=True
+                    )
+                    view = pdk.ViewState(latitude=lat, longitude=lon, zoom=10)  # Augmenté de 7 à 10
+                    deck = pdk.Deck(
+                        initial_view_state=view,
+                        layers=[layer],
+                        tooltip={"text": "{name} : {address}"},  # type: ignore[arg-type]
+                    )
+                    st.pydeck_chart(deck, use_container_width=True)
+                    return
+        
+        # Si aucune adresse trouvée, afficher un message d'erreur
+        error_style = (
+            'background:rgba(248, 215, 218, 0.8);border:1px solid rgba(220, 53, 69, 0.4);border-radius:12px;'
+            'padding:12px 20px;margin-bottom:1rem;text-align:center;'
+            'box-shadow:0 4px 16px rgba(220, 53, 69, 0.15);'
+            'transition:all 0.3s ease;'
+            'position:relative;'
+            'overflow:hidden;'
+        )
+        error_html = f'''
+        <div style="{error_style}">
+            <p style="margin:0;font-size:1.1rem;color:#000;font-weight:600;">Aucune colonne de localisation trouvée dans les données.</p>
+        </div>
+        '''
+        st.markdown(error_html, unsafe_allow_html=True)
+        return
+    
+    # Traitement des colonnes de localisation trouvées
+    map_data = []
+    
+    # Géocoder toutes les adresses de localisation
+    for col in location_columns:
+        addr = info.get(col, '')
+        if addr and str(addr).strip() and str(addr).strip().lower() not in ['nan', 'n/a', '-', '']:
+            with st.spinner(f'Géocodage de {col} en cours...'):
+                lat, lon = geocode(str(addr))
+                if lat and lon:
+                    # Créer un nom court pour la colonne
+                    name = col.replace('Localisation', '').replace('(', '').replace(')', '').strip()
+                    if not name:
+                        name = "Localisation"
+                    map_data.append({'lat': lat, 'lon': lon, 'name': name, 'address': str(addr)})
+    
+    if map_data:
+        df_map = pd.DataFrame(map_data)
+        
+        # Ajouter des couleurs différentes pour chaque point
+        colors = [
+            [0, 114, 178, 200],      # Bleu IVEO
+            [220, 53, 69, 200],      # Rouge
+            [40, 167, 69, 200],      # Vert
+            [255, 193, 7, 200],      # Jaune
+            [108, 117, 125, 200],    # Gris
+            [111, 66, 193, 200],     # Violet
+            [255, 87, 51, 200],      # Orange
+            [23, 162, 184, 200],     # Cyan
+        ]
+        
+        # Assigner une couleur à chaque point
+        df_map['color'] = [colors[i % len(colors)] for i in range(len(df_map))]
+        
         layer = pdk.Layer(
             'ScatterplotLayer',
             df_map,
             get_position='[lon,lat]',
-            get_radius=1000,
-            get_color=[0,114,178],
+            get_radius=8000,  # Rayon fixe plus grand
+            get_fill_color='color',
             pickable=True
         )
-        view = pdk.ViewState(latitude=lat, longitude=lon, zoom=7)
+        
+        # Centrer la carte sur la première localisation au lieu de la moyenne
+        center_lat = df_map['lat'].iloc[0]
+        center_lon = df_map['lon'].iloc[0]
+        
+        view = pdk.ViewState(latitude=center_lat, longitude=center_lon, zoom=7)  # Réduit de 10 à 7 pour éviter le zoom trop proche
         deck = pdk.Deck(
             initial_view_state=view,
             layers=[layer],
             # ignore incorrect type stub for tooltip dict
-            tooltip={"text": "{name} : [{lat}, {lon}]"},  # type: ignore[arg-type]
+            tooltip={
+                "html": "<b>📍 {name}</b><br/><b>Adresse:</b> {address}<br/><b>Coordonnées:</b> {lat:.4f}, {lon:.4f}",
+                "style": {"backgroundColor": "rgba(255, 255, 255, 0.95)", "color": "black", "padding": "10px", "borderRadius": "8px", "boxShadow": "0 4px 16px rgba(0,0,0,0.2)"}
+            },  # type: ignore[arg-type]
         )
         st.pydeck_chart(
             deck,
@@ -492,7 +543,7 @@ def render_map_section(info):
         )
         error_html = f'''
         <div style="{error_style}">
-            <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
+            <p style="margin:0;font-size:1.1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
         </div>
         '''
         st.markdown(error_html, unsafe_allow_html=True)

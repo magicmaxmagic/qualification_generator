@@ -12,6 +12,7 @@ Version : 1.1 - 2025.01.16
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -19,7 +20,7 @@ from io import BytesIO
 import base64
 import tempfile
 import os
-from reportlab.platypus import Image, Spacer
+from reportlab.platypus import Image, Spacer, Paragraph, PageBreak
 from reportlab.lib.units import inch
 
 # Configuration matplotlib pour de meilleurs graphiques
@@ -135,12 +136,12 @@ class PDFChartGenerator:
             
             # Créer le graphique en camembert
             fig, ax = plt.subplots(figsize=self.fig_size)
-            
             # Palette de couleurs
-            colors = plt.cm.Set3(np.linspace(0, 1, len(category_counts)))
+            cmap = cm.get_cmap('Set3')
+            colors = [cmap(i) for i in range(len(category_counts))]
             
             wedges, texts, autotexts = ax.pie(
-                category_counts.values, 
+                category_counts.values,
                 labels=category_counts.index,
                 autopct='%1.1f%%',
                 colors=colors,
@@ -178,7 +179,7 @@ class PDFChartGenerator:
             print(f"Erreur lors de la création du graphique solutions: {e}")
             return None
     
-    def create_comparative_chart(self, df_comp, selected_companies=None):
+    def create_comparative_chart(self, df_comp):
         """
         Crée un graphique d'analyse comparative.
         
@@ -206,8 +207,7 @@ class PDFChartGenerator:
             fig, ax = plt.subplots(figsize=self.fig_size)
             
             # Graphique en barres horizontales
-            bars = ax.barh(range(len(category_counts)), category_counts.values,
-                          color=self.theme_color, alpha=0.8)
+            bars = ax.barh(range(len(category_counts)), category_counts.values, color=self.theme_color, alpha=0.8)
             
             # Personnalisation
             ax.set_title('Nombre de critères par catégorie', 
@@ -219,8 +219,7 @@ class PDFChartGenerator:
             
             # Ajouter les valeurs
             for i, (bar, value) in enumerate(zip(bars, category_counts.values)):
-                ax.text(bar.get_width() + 0.3, bar.get_y() + bar.get_height()/2,
-                       str(value), ha='left', va='center', fontweight='bold')
+                ax.text(bar.get_width() + 0.3, bar.get_y() + bar.get_height()/2, str(value), ha='left', va='center', fontweight='bold')
             
             plt.tight_layout()
             
