@@ -40,8 +40,7 @@ st.markdown(
 # -----------------------------------------------------------------------------
 # 4) Charger le CSS perso
 # -----------------------------------------------------------------------------
-with open("styles.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# Fichier styles.css supprimé - styles intégrés dans le code ci-dessus
 
 # -----------------------------------------------------------------------------
 # 5) Sidebar : logo, uploader, navigation
