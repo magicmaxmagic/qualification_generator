@@ -6,3 +6,12 @@ geopy
 streamlit-cookies-manager
 streamlit-aggrid
 openai
+requests
+reportlab
+matplotlib
+seaborn
+cairosvg
+Pillow
+pdfkit>=1.0.0
+weasyprint>=60.0
+
