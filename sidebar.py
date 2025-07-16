@@ -663,54 +663,30 @@ def add_pdf_download_section(df_ent=None, df_sol=None, df_comp=None, df_align=No
         from app.pdf_generator_html import generate_report_with_export_options, create_download_link
         from datetime import datetime
         
-        # Détection de l'environnement cloud
-        import os
-        is_cloud_env = (
-            os.getenv('STREAMLIT_CLOUD') == 'true' or 
-            os.getenv('RENDER') is not None or 
-            os.getenv('HEROKU') is not None or 
-            os.getenv('RAILWAY_ENVIRONMENT') is not None
-        )
-        
         # Informations sur le rapport - toujours affichées
-        if is_cloud_env:
-            st.sidebar.markdown("""
-            <div style="
-                background: rgba(255, 193, 7, 0.1);
-                border: 1px solid rgba(255, 193, 7, 0.4);
-                border-radius: 8px;
-                padding: 12px 16px;
-                margin: 16px 0;
-                color: #856404;
-                font-size: 0.9rem;
-                font-weight: 500;
-            ">
-                ⚠️ Environnement cloud détecté - Export HTML uniquement disponible
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.sidebar.markdown("""
-            <div style="
-                background: rgba(248, 249, 250, 0.9);
-                border: 1px solid rgba(0, 114, 178, 0.2);
-                border-radius: 8px;
-                padding: 12px 16px;
-                margin: 16px 0;
-                color: #0072B2;
-                font-size: 0.9rem;
-                font-weight: 500;
-            ">
-                Générez un rapport complet incluant toutes les analyses avec les filtres appliqués
-            </div>
-            """, unsafe_allow_html=True)
+        st.sidebar.markdown("""
+        <div style="
+            background: rgba(248, 249, 250, 0.9);
+            border: 1px solid rgba(0, 114, 178, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            color: #0072B2;
+            font-size: 0.9rem;
+            font-weight: 500;
+        ">
+            Générez un rapport complet incluant toutes les analyses avec les filtres appliqués
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Boutons d'export - adapté selon l'environnement
-        if is_cloud_env:
-            # Environnement cloud : HTML seulement
-            if st.sidebar.button(
-                "📄 Générer HTML",
+        # Boutons d'export - toujours les deux options disponibles
+        col1, col2 = st.sidebar.columns(2)
+        
+        with col1:
+            if st.button(
+                "📄 HTML",
                 key="generate_html_button",
-                help="Génère et télécharge le rapport HTML (PDF non disponible sur cloud)"
+                help="Génère et télécharge le rapport HTML"
             ):
                 with st.spinner("Génération du rapport HTML..."):
                     try:
@@ -722,58 +698,32 @@ def add_pdf_download_section(df_ent=None, df_sol=None, df_comp=None, df_align=No
                             download_link = create_download_link(reports["html"], filename)
                             st.success("✅ Rapport HTML généré!")
                             st.markdown(download_link, unsafe_allow_html=True)
-                            st.info("💡 Pour convertir en PDF : Ouvrez le fichier HTML → Ctrl+P → Enregistrer en PDF")
                         else:
                             st.error("❌ Erreur lors de la génération HTML")
                     except Exception as e:
                         st.error(f"❌ Erreur HTML: {str(e)}")
-        else:
-            # Environnement local : HTML et PDF
-            col1, col2 = st.sidebar.columns(2)
-            
-            with col1:
-                if st.button(
-                    "📄 HTML",
-                    key="generate_html_button",
-                    help="Génère et télécharge le rapport HTML"
-                ):
-                    with st.spinner("Génération du rapport HTML..."):
-                        try:
-                            reports = generate_report_with_export_options(df_ent, df_sol, df_comp, df_align)
-                            
-                            if reports["html"]:
-                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                filename = f"rapport_iveo_{timestamp}.html"
-                                download_link = create_download_link(reports["html"], filename)
-                                st.success("✅ Rapport HTML généré!")
-                                st.markdown(download_link, unsafe_allow_html=True)
-                            else:
-                                st.error("❌ Erreur lors de la génération HTML")
-                        except Exception as e:
-                            st.error(f"❌ Erreur HTML: {str(e)}")
-            
-            with col2:
-                if st.button(
-                    "📄 PDF",
-                    key="generate_pdf_button",
-                    help="Génère et télécharge le rapport PDF"
-                ):
-                    with st.spinner("Génération du rapport PDF..."):
-                        try:
-                            reports = generate_report_with_export_options(df_ent, df_sol, df_comp, df_align)
-                            
-                            if reports["pdf"]:
-                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                filename = f"rapport_iveo_{timestamp}.pdf"
-                                download_link = create_download_link(reports["pdf"], filename)
-                                st.success("✅ Rapport PDF généré!")
-                                st.markdown(download_link, unsafe_allow_html=True)
-                            else:
-                                st.error("❌ Erreur lors de la génération PDF")
-                                st.info("💡 Essayez l'export HTML puis convertissez avec votre navigateur")
-                        except Exception as e:
-                            st.error(f"❌ Erreur PDF: {str(e)}")
-                            st.info("💡 Essayez l'export HTML puis convertissez avec votre navigateur")
+        
+        with col2:
+            if st.button(
+                "📄 PDF",
+                key="generate_pdf_button",
+                help="Génère et télécharge le rapport PDF (peut échouer sur certaines plateformes)"
+            ):
+                with st.spinner("Génération du rapport PDF..."):
+                    try:
+                        reports = generate_report_with_export_options(df_ent, df_sol, df_comp, df_align)
+                        
+                        if reports["pdf"]:
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"rapport_iveo_{timestamp}.pdf"
+                            download_link = create_download_link(reports["pdf"], filename)
+                            st.success("✅ Rapport PDF généré!")
+                            st.markdown(download_link, unsafe_allow_html=True)
+                        else:
+                            st.info("💡 Export PDF indisponible. Utilisez HTML puis convertissez avec votre navigateur.")
+                    except Exception as e:
+                        st.warning(f"⚠️ Erreur PDF: {str(e)}")
+                        st.info("💡 Utilisez l'export HTML puis convertissez avec votre navigateur (Ctrl+P → Enregistrer en PDF)")
     
     except ImportError as e:
         st.sidebar.error(f"❌ Module de rapport non disponible: {str(e)}")

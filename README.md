@@ -4,7 +4,7 @@
 
 IVÉO BI est une application de tableau de bord développée avec Streamlit pour l'analyse et la comparaison de solutions de stationnement intelligent. Cette plateforme permet d'analyser, comparer et évaluer différentes entreprises et solutions technologiques dans le domaine du stationnement intelligent.
 
-## 🚀 Installation et Démarrage
+## Installation et Démarrage
 
 ### Installation locale
 ```bash
@@ -19,178 +19,210 @@ pip install -r requirements.txt
 streamlit run main.py
 ```
 
-### ⚠️ Déploiement Cloud
-Pour le déploiement sur plateformes cloud (Streamlit Cloud, Render, Heroku, etc.), les dépendances PDF (`pdfkit` et `weasyprint`) peuvent causer des erreurs à cause des bibliothèques système manquantes.
+### Déploiement Cloud
+Pour le déploiement sur plateformes cloud (Streamlit Cloud, Render, Heroku, etc.), les dépendances PDF (pdfkit et weasyprint) peuvent causer des erreurs à cause des bibliothèques système manquantes.
 
 **Solution automatique :** L'application détecte automatiquement l'environnement cloud et désactive l'export PDF. Seul l'export HTML reste disponible.
 
 **En cas d'erreur d'installation :**
-1. Commentez ces lignes dans `requirements.txt` :
+1. Commentez ces lignes dans requirements.txt :
    ```
    # pdfkit>=1.0.0
    # weasyprint>=60.0
    ```
 2. Redéployez l'application
 
-## Fonctionnalités Principales
+## Architecture de l'Application
 
-### Accueil
-- Vue d'ensemble du projet IVÉO
-- Navigation vers les différents modules
-- Présentation des objectifs et de la mission
-
-### Analyse des Entreprises
-- Profils détaillés des entreprises partenaires
-- Informations de contact et données organisationnelles
-- Visualisations interactives des données d'entreprise
-
-### Solutions Technologiques
-- Catalogue des solutions de stationnement intelligent
-- Spécifications techniques détaillées
-- Comparaisons fonctionnelles
-
-### Analyse Comparative
-- Grille d'évaluation interactive avec système de notation binaire (0/1)
-- Filtrage par catégorie et niveau d'exigence
-- Sélection d'entreprises pour comparaisons personnalisées
-- Informations complémentaires détaillées avec justifications
-- Interface moderne et navigation fluide
-- Tableau interactif : cliquez sur une ligne pour voir les détails d'une entreprise spécifique
-
-## Installation et Configuration
-
-### Prérequis
-- Python 3.8 ou supérieur
-- pip (gestionnaire de paquets Python)
-
-### Installation
-
-1. Cloner le dépôt
-   ```bash
-   git clone [URL_DU_DEPOT]
-   cd BI
-   ```
-
-2. Créer un environnement virtuel
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Sur Windows: venv\Scripts\activate
-   ```
-
-3. Installer les dépendances
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configurer les données
-   - Placez votre fichier Excel de données dans le dossier `uploads/`
-   - Assurez-vous que le fichier contient les feuilles nécessaires (notamment "Analyse comparative")
-
-## Utilisation
-
-### Démarrage de l'application
-
-```bash
-streamlit run main.py
-```
-
-L'application sera accessible à l'adresse : `http://localhost:8501`
-
-### Navigation
-
-1. Page d'Accueil : Vue d'ensemble et navigation
-2. Entreprises : Analyse des profils d'entreprises
-3. Solutions : Catalogue des solutions technologiques
-4. Analyse Comparative : Comparaison interactive des solutions
-
-### Utilisation de l'Analyse Comparative
-
-1. Téléchargement des données : Utilisez la sidebar pour charger votre fichier Excel
-2. Filtrage : Sélectionnez les catégories et niveaux d'exigence souhaités
-3. Sélection d'entreprises : Choisissez les entreprises à comparer
-4. Interaction : Cliquez sur une ligne du tableau pour voir les détails
-5. Analyse : Consultez les informations complémentaires pour chaque entreprise
-
-## Structure du Projet
-
+### Structure des Fichiers
 ```
 BI/
-├── main.py                     # Point d'entrée de l'application
+├── main.py                     # Point d'entrée principal
 ├── sidebar.py                  # Configuration de la barre latérale
-├── styles.css                  # Styles CSS personnalisés
 ├── requirements.txt            # Dépendances Python
 ├── Dockerfile                  # Configuration Docker
-├── LICENSE                     # Licence commerciale propriétaire
-├── .gitignore                  # Fichiers à ignorer par Git
 ├── app/
 │   ├── __init__.py
-│   ├── utils.py               # Utilitaires et fonctions communes
+│   ├── utils.py               # Fonctions utilitaires
+│   ├── pdf_generator.py       # Génération PDF avec ReportLab
+│   ├── pdf_generator_html.py  # Génération HTML et PDF
 │   └── pages/
 │       ├── home.py            # Page d'accueil
-│       ├── entreprise.py      # Page des entreprises
-│       ├── solution.py        # Page des solutions
-│       └── analyse_comparative.py  # Page d'analyse comparative
-├── uploads/                   # Dossier pour les fichiers de données (gitignored)
-├── .streamlit/               # Configuration Streamlit
-└── .devcontainer/           # Configuration pour développement en conteneur
+│       ├── entreprise.py      # Analyse des entreprises
+│       ├── solution.py        # Catalogue des solutions
+│       ├── analyse_comparative.py  # Comparaison interactive
+│       └── chatbot.py         # Assistant IA
+└── uploads/                   # Fichiers de données (ignorés par Git)
 ```
 
-## Technologies Utilisées
+### Composants Principaux
 
-- Streamlit - Framework de développement d'applications web
-- Pandas - Manipulation et analyse de données
-- Plotly - Visualisations interactives
-- OpenPyXL - Lecture de fichiers Excel
-- Geopy - Géolocalisation et cartographie
+#### 1. Interface Utilisateur (main.py)
+- Configuration de l'application Streamlit
+- Navigation principale entre les pages
+- Gestion des sessions utilisateur
+- Chargement des styles CSS
+
+#### 2. Barre Latérale (sidebar.py)
+- Système de filtrage dynamique
+- Sélection d'entreprises et critères
+- Gestion des cookies pour la persistance
+- Export de rapports PDF/HTML
+
+#### 3. Gestion des Données (app/utils.py)
+- Chargement et validation des fichiers Excel
+- Nettoyage et transformation des données
+- Fonctions de cache pour les performances
+- Validation des formats de données
+
+#### 4. Génération de Rapports
+- **pdf_generator.py** : Rapports PDF avec ReportLab (graphiques, tableaux)
+- **pdf_generator_html.py** : Rapports HTML et conversion PDF avec WeasyPrint
+- Détection automatique de l'environnement cloud
+- Fallback HTML si bibliothèques PDF indisponibles
+
+## Fonctionnalités Détaillées
+
+### 1. Page d'Accueil (home.py)
+- Vue d'ensemble du projet IVÉO
+- Navigation vers les modules spécialisés
+- Présentation de la mission et des objectifs
+- Métriques générales du projet
+
+### 2. Analyse des Entreprises (entreprise.py)
+- Profils détaillés des entreprises partenaires
+- Informations de contact et données organisationnelles
+- Visualisations interactives des données
+- Géolocalisation des entreprises
+- Filtrage par secteur et localisation
+
+### 3. Solutions Technologiques (solution.py)
+- Catalogue complet des solutions de stationnement
+- Spécifications techniques détaillées
+- Comparaisons fonctionnelles
+- Gestion des images et documentation
+- Filtrage par catégorie et fournisseur
+
+### 4. Analyse Comparative (analyse_comparative.py)
+- Grille d'évaluation interactive avec notation binaire (0/1)
+- Filtrage dynamique par catégorie et niveau d'exigence
+- Sélection personnalisée d'entreprises
+- Informations complémentaires avec justifications
+- Interface moderne avec navigation fluide
+- Graphiques radar pour comparaisons visuelles
+
+### 5. Assistant IA (chatbot.py)
+- Interface conversationnelle avec OpenAI
+- Analyse contextuelle des données
+- Recommandations personnalisées
+- Support pour questions techniques
+
+## Technologies et Dépendances
+
+### Frameworks Principal
+- **Streamlit** : Framework d'application web pour Python
+- **Pandas** : Manipulation et analyse de données
+- **Plotly** : Visualisations interactives et graphiques
+
+### Traitement des Données
+- **OpenPyXL** : Lecture et écriture de fichiers Excel
+- **Geopy** : Géolocalisation et services cartographiques
+- **streamlit-aggrid** : Tableaux interactifs avancés
+
+### Génération de Rapports
+- **ReportLab** : Génération de PDF programmatique
+- **WeasyPrint** : Conversion HTML vers PDF (environnement local)
+- **pdfkit** : Alternative pour génération PDF
+- **Pillow** : Traitement d'images
+
+### Visualisations
+- **Matplotlib** : Graphiques statistiques
+- **Seaborn** : Visualisations statistiques avancées
+- **cairosvg** : Rendu vectoriel SVG
+
+### Gestion des Sessions
+- **streamlit-cookies-manager** : Persistance des préférences utilisateur
+- **OpenAI** : Intelligence artificielle conversationnelle
 
 ## Format des Données
 
-### Structure du fichier Excel
+### Structure du Fichier Excel
+Le fichier Excel principal doit contenir plusieurs feuilles :
 
-Le fichier Excel doit contenir une feuille "Analyse comparative" avec la structure suivante :
+#### Feuille "Analyse comparative"
+| Colonnes de Base | Colonnes d'Entreprises (alternées) |
+|------------------|-----------------------------------|
+| Type d'exigence | Entreprise 1 |
+| Domaine | Information complémentaire 1 |
+| Exigence différenciateur | Entreprise 2 |
+| Exigence | Information complémentaire 2 |
+| Description | ... |
+| Catégorie | |
 
-| Colonnes 0-3 | Colonnes 4+ (alternées) |
-|--------------|-------------------------|
-| - Catégories | - Entreprise 1 |
-| - Fonctionnalités | - Information complémentaire 1 |
-| - Exigence différenciateur | - Entreprise 2 |
-| - Description | - Information complémentaire 2 |
-| | - ... |
+#### Feuille "Entreprises"
+- Nom de l'entreprise
+- Secteur d'activité
+- Localisation
+- Statut
+- Site web
+- Description
+- URL du logo
 
-### Format des données
-- Scores d'entreprises : Valeurs binaires (0 ou 1)
-- Informations complémentaires : Texte libre avec justifications
-- Catégories : Classification des fonctionnalités
-- Exigences : Niveaux d'importance des critères
+#### Feuille "Solutions"
+- Nom de la solution
+- Catégorie
+- Fournisseur
+- Statut
+- Description
+- Site web
+- URL du logo
+- URL de vidéo
+
+### Formats de Données Acceptés
+- **Scores d'évaluation** : Valeurs binaires (0, 1, "Oui", "Non")
+- **Informations complémentaires** : Texte libre avec justifications
+- **URLs** : Liens web valides pour sites et médias
+- **Catégories** : Classification hiérarchique des fonctionnalités
 
 ## Sécurité et Confidentialité
 
 ### Protection des Données
-- Les fichiers sensibles sont exclus du dépôt grâce au fichier `.gitignore`.
-- Les données d'entreprises ne doivent jamais être versionnées.
-- Utilisez des variables d'environnement pour toute information confidentielle.
-- Contrôlez strictement l'accès aux informations sensibles.
+- Fichiers sensibles exclus du versioning (.gitignore)
+- Données d'entreprises jamais versionnées
+- Variables d'environnement pour informations confidentielles
+- Contrôle d'accès strict aux informations sensibles
 
-### Bonnes Pratiques de Sécurité
-- Ne jamais committer de vraies données d'entreprises ou de clients.
-- Utiliser uniquement des données de test pour les démonstrations et le développement.
-- Vérifier régulièrement l'absence de fichiers sensibles dans Git.
-- Respecter les réglementations sur la protection des données.
-
-### Fichiers à cacher impérativement
+### Fichiers Protégés
 ```
 uploads/           # Données d'entreprises
 *.xlsx, *.xls     # Fichiers Excel sensibles
 .env              # Variables d'environnement
 secrets/          # Clés API et tokens
 credentials/      # Informations d'authentification
-+test_app_quick.py # Script de test pouvant contenir des données sensibles
-*.bak             # Fichiers de sauvegarde
-*.tmp             # Fichiers temporaires
+__pycache__/      # Fichiers compilés Python
+*.bak, *.tmp      # Fichiers temporaires
 ```
 
-## Déploiement avec Docker
+## Déploiement et Configuration
 
+### Environnement Local
+```bash
+# Créer un environnement virtuel
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Installer les dépendances
+pip install -r requirements.txt
+
+# Configurer les variables d'environnement
+cp .env.example .env
+# Éditer .env avec vos configurations
+
+# Lancer l'application
+streamlit run main.py
+```
+
+### Déploiement Docker
 ```bash
 # Construire l'image
 docker build -t iveo-bi .
@@ -199,58 +231,82 @@ docker build -t iveo-bi .
 docker run -p 8501:8501 iveo-bi
 ```
 
-## Tests
+### Configuration Streamlit
+Le fichier `.streamlit/config.toml` contient :
+- Configuration du serveur
+- Paramètres d'affichage
+- Options de sécurité
+- Thème et couleurs
 
-```bash
-# Exécuter les tests de validation
-python test_app_quick.py
-```
+## Utilisation Avancée
 
-## Développement
+### Personnalisation des Filtres
+- Filtres par catégorie d'exigence
+- Sélection d'entreprises personnalisée
+- Niveaux d'exigence configurables
+- Persistance des préférences via cookies
 
-### Ajout de nouvelles fonctionnalités
+### Génération de Rapports
+- **HTML** : Rapports interactifs avec navigation
+- **PDF** : Documents professionnels pour impression
+- **Détection automatique** : Environnement cloud vs local
+- **Fallback intelligent** : HTML si PDF indisponible
 
-1. Nouvelles pages : Créez un fichier dans `app/pages/`
-2. Fonctions utilitaires : Ajoutez-les dans `app/utils.py`
-3. Styles : Modifiez `styles.css` pour les personnalisations CSS
-4. Navigation : Mettez à jour `main.py` et `sidebar.py`
+### Optimisations Performance
+- Cache intelligent des données
+- Chargement différé des gros fichiers
+- Compression des images
+- Optimisation des requêtes
 
-### Guidelines de développement
+## API et Extensions
 
-- Suivre les conventions de nommage Python (PEP 8)
-- Documenter les fonctions avec des docstrings
-- Tester les modifications avant de les pousser
-- Maintenir la structure modulaire du projet
-- Respecter la licence propriétaire
+### Intégration OpenAI
+- Configuration via variables d'environnement
+- Analyse contextuelle des données
+- Génération de recommandations
+- Support multilingue
 
-## Fonctionnalités Avancées
+### Extensibilité
+- Architecture modulaire pour nouvelles fonctionnalités
+- Système de plugins pour analyseurs personnalisés
+- API REST pour intégration externe
+- Hooks pour traitements personnalisés
 
-### Analyse Comparative v2.0
+## Maintenance et Support
 
-- Interface moderne et responsive
-- Système de badges visuels pour les scores binaires
-- Filtrage dynamique par catégories et exigences
-- Sélection interactive d'entreprises
-- Cartes d'informations détaillées avec justifications
-- Navigation fluide avec état de session préservé
+### Surveillance
+- Logs d'application détaillés
+- Métriques de performance
+- Monitoring des erreurs
+- Alertes automatiques
 
-### Performances
+### Mises à Jour
+- Processus de déploiement automatisé
+- Tests de régression
+- Sauvegarde des configurations
+- Migration des données
 
-- Mise en cache intelligente des données
-- Chargement optimisé des fichiers Excel
-- Interface responsive adaptée aux différentes tailles d'écran
-
-## Support et Contact
-
-Pour toute question ou support technique, contactez l'équipe de développement IVÉO.
-
-## Licence
+## Licence et Conformité
 
 Ce projet est protégé par une licence commerciale propriétaire.
 
-Copyright © 2025 IVÉO et École de Technologie Supérieure (ETS) de Montréal. Tous droits réservés.
+**Copyright © 2025 IVÉO et École de Technologie Supérieure (ETS) de Montréal. Tous droits réservés.**
 
 ### Utilisation Autorisée
+- Usage interne pour les projets IVÉO
+- Recherche académique à l'ETS
+- Développement et personnalisation autorisés
+- Distribution restreinte aux parties autorisées
+
+### Conformité Réglementaire
+- Respect des réglementations sur la protection des données
+- Conformité aux standards de sécurité industriels
+- Audit de sécurité régulier
+- Documentation de conformité maintenue
+
+## Support Technique
+
+Pour toute question technique, bug report ou demande d'amélioration, contactez l'équipe de développement IVÉO via les canaux officiels.
 - Utilisation dans le cadre des activités autorisées par IVÉO
 - Accès aux fonctionnalités selon les droits accordés
 - Consultation de la documentation

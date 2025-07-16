@@ -32,6 +32,62 @@ st.markdown(
     [data-testid="collapsedControl"] + div [data-testid="source-link"] {
         display: none !important;
     }
+    
+    /* Réduction de la taille du texte global */
+    .main .block-container {
+        font-size: 0.9rem !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* Réduction taille des headers */
+    h1 {
+        font-size: 1.8rem !important;
+    }
+    h2 {
+        font-size: 1.5rem !important;
+    }
+    h3 {
+        font-size: 1.3rem !important;
+    }
+    h4 {
+        font-size: 1.1rem !important;
+    }
+    
+    /* Réduction taille du texte des éléments Streamlit */
+    .stMarkdown, .stText {
+        font-size: 0.9rem !important;
+    }
+    
+    /* Réduction taille des boutons */
+    .stButton > button {
+        font-size: 0.85rem !important;
+        padding: 0.4rem 0.8rem !important;
+    }
+    
+    /* Réduction taille des selectbox et multiselect */
+    .stSelectbox label, .stMultiSelect label {
+        font-size: 0.85rem !important;
+    }
+    
+    /* Réduction taille des tableaux */
+    .stDataFrame, .stTable {
+        font-size: 0.8rem !important;
+    }
+    
+    /* Réduction taille des métriques */
+    .metric-container {
+        font-size: 0.8rem !important;
+    }
+    
+    /* Réduction taille sidebar */
+    .stSidebar {
+        font-size: 0.85rem !important;
+    }
+    
+    /* Réduction espacement global */
+    .element-container {
+        margin-bottom: 0.5rem !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
