@@ -16,18 +16,36 @@ from datetime import datetime
 import json
 from sidebar import cookies
 
-# Imports pour l'export PDF
+# Imports pour l'export PDF avec gestion d'erreurs
 try:
     import pdfkit
     PDFKIT_AVAILABLE = True
 except ImportError:
     PDFKIT_AVAILABLE = False
+    print("⚠️ pdfkit non disponible - Export PDF désactivé")
 
 try:
     from weasyprint import HTML
     WEASYPRINT_AVAILABLE = True
 except ImportError:
     WEASYPRINT_AVAILABLE = False
+    print("⚠️ weasyprint non disponible - Export PDF désactivé")
+
+# Détection de l'environnement cloud au niveau module
+import os
+IS_CLOUD_ENV = (
+    os.getenv('STREAMLIT_CLOUD') == 'true' or 
+    os.getenv('RENDER') is not None or 
+    os.getenv('HEROKU') is not None or 
+    os.getenv('RAILWAY_ENVIRONMENT') is not None or
+    os.getenv('VERCEL') is not None
+)
+
+# Message d'information sur l'environnement
+if IS_CLOUD_ENV:
+    print("🌐 Environnement cloud détecté - Export PDF désactivé automatiquement")
+elif not (PDFKIT_AVAILABLE or WEASYPRINT_AVAILABLE):
+    print("⚠️ Aucune bibliothèque PDF disponible - Export HTML uniquement")
 
 def _clean_na_value(value):
     """
@@ -1783,6 +1801,11 @@ def generate_pdf_from_html(html_content):
     Returns:
         bytes: Contenu PDF ou None si erreur
     """
+    # En environnement cloud, retourner None immédiatement
+    if IS_CLOUD_ENV:
+        st.info("🌐 Environnement cloud détecté - Export PDF désactivé pour éviter les erreurs de bibliothèques système")
+        return None
+    
     try:
         # Essayer avec WeasyPrint d'abord
         if WEASYPRINT_AVAILABLE:
@@ -1790,17 +1813,22 @@ def generate_pdf_from_html(html_content):
                 pdf_bytes = HTML(string=html_content).write_pdf()
                 return pdf_bytes
             except Exception as e:
-                st.warning(f"Erreur WeasyPrint: {str(e)}")
+                error_msg = str(e)
+                if "libpango" in error_msg or "shared object" in error_msg:
+                    st.warning("⚠️ Bibliothèques système manquantes pour PDF. Utilisez l'export HTML.")
+                    return None
+                st.warning(f"Erreur WeasyPrint: {error_msg}")
         
         # Fallback avec pdfkit
         if PDFKIT_AVAILABLE:
             try:
+                MARGIN = '0.75in'
                 options = {
                     'page-size': 'A4',
-                    'margin-top': '0.75in',
-                    'margin-right': '0.75in',
-                    'margin-bottom': '0.75in',
-                    'margin-left': '0.75in',
+                    'margin-top': MARGIN,
+                    'margin-right': MARGIN,
+                    'margin-bottom': MARGIN,
+                    'margin-left': MARGIN,
                     'encoding': "UTF-8",
                     'no-outline': None,
                     'enable-local-file-access': None
@@ -1808,14 +1836,22 @@ def generate_pdf_from_html(html_content):
                 pdf_bytes = pdfkit.from_string(html_content, False, options=options)
                 return pdf_bytes
             except Exception as e:
-                st.warning(f"Erreur pdfkit: {str(e)}")
+                error_msg = str(e)
+                if "wkhtmltopdf" in error_msg:
+                    st.warning("⚠️ wkhtmltopdf non disponible. Utilisez l'export HTML.")
+                    return None
+                st.warning(f"Erreur pdfkit: {error_msg}")
         
         # Si aucune bibliothèque n'est disponible
         st.error("Aucune bibliothèque PDF disponible. Installez weasyprint ou pdfkit.")
         return None
         
     except Exception as e:
-        st.error(f"Erreur lors de la génération PDF: {str(e)}")
+        error_msg = str(e)
+        if "libpango" in error_msg or "shared object" in error_msg:
+            st.warning("⚠️ Bibliothèques système manquantes pour PDF. Utilisez l'export HTML.")
+        else:
+            st.error(f"Erreur lors de la génération PDF: {error_msg}")
         return None
 
 def generate_report_pdf(df_ent, df_sol, df_comp, df_align=None):

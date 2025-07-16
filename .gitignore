@@ -4,7 +4,27 @@
 
 # =====================================
 # DONNÉES SENSIBLES ET CONFIDENTIELLES
-# =====================================
+# ================# ========================
+# BACKUPS ET TEMPORAIRES
+# ========================
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.swp
+*.tmp
+
+# Temporary directories
+tmp/
+temp/
+temporary/
+
+# Fichiers de requirements temporaires (utilisez requirements.txt)
+requirements-local.txt
+requirements-cloud.txt
+requirements-dev.txt=====
 # Dossier des fichiers téléchargés (données d'entreprises)
 uploads/
 uploads/*

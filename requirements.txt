@@ -1,3 +1,8 @@
+# ==============================================
+# IVÉO BI - Dépendances Python
+# ==============================================
+
+# Dépendances principales (obligatoires)
 streamlit
 pandas
 openpyxl
@@ -12,6 +17,17 @@ matplotlib
 seaborn
 cairosvg
 Pillow
+
+# Dépendances PDF (optionnelles pour cloud)
+# Ces bibliothèques peuvent échouer sur certaines plateformes cloud
+# à cause des dépendances système manquantes (libpango, wkhtmltopdf)
+# L'application continuera de fonctionner sans elles (export HTML uniquement)
 pdfkit>=1.0.0
 weasyprint>=60.0
 
+# ==============================================
+# NOTES IMPORTANTES:
+# - Si déploiement cloud échoue, commentez pdfkit et weasyprint
+# - L'app détecte automatiquement l'environnement cloud
+# - Export PDF désactivé automatiquement sur cloud
+# ==============================================

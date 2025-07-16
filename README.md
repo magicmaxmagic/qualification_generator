@@ -4,6 +4,34 @@
 
 IVÉO BI est une application de tableau de bord développée avec Streamlit pour l'analyse et la comparaison de solutions de stationnement intelligent. Cette plateforme permet d'analyser, comparer et évaluer différentes entreprises et solutions technologiques dans le domaine du stationnement intelligent.
 
+## 🚀 Installation et Démarrage
+
+### Installation locale
+```bash
+# Cloner le repository
+git clone [url-du-repo]
+cd BI
+
+# Installer les dépendances
+pip install -r requirements.txt
+
+# Lancer l'application
+streamlit run main.py
+```
+
+### ⚠️ Déploiement Cloud
+Pour le déploiement sur plateformes cloud (Streamlit Cloud, Render, Heroku, etc.), les dépendances PDF (`pdfkit` et `weasyprint`) peuvent causer des erreurs à cause des bibliothèques système manquantes.
+
+**Solution automatique :** L'application détecte automatiquement l'environnement cloud et désactive l'export PDF. Seul l'export HTML reste disponible.
+
+**En cas d'erreur d'installation :**
+1. Commentez ces lignes dans `requirements.txt` :
+   ```
+   # pdfkit>=1.0.0
+   # weasyprint>=60.0
+   ```
+2. Redéployez l'application
+
 ## Fonctionnalités Principales
 
 ### Accueil
