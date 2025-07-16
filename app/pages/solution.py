@@ -32,6 +32,7 @@ import time
 from pathlib import Path
 from geopy.geocoders import Nominatim
 from sidebar import cookies, apply_sidebar_styles
+from typing import Any
 
 # Version: 2025.01.10 - Page Solution compacte avec gestion d'images - Design identique à Entreprise
 
@@ -185,16 +186,7 @@ THEME = {
 }
 
 HR = '<hr style="margin:1.5rem 0 1rem 0; border:none; border-top:2px solid #e3f0fa;" />'
-SEPARATOR = '<div style="margin:1.2rem 0;border-bottom:1px solid rgba(0,0,0,0.1);"></div>'
-
-# --- Caching Geocoder ---
-@st.cache_data(show_spinner=False)
-def geocode(address: str):
-    try:
-        loc = Nominatim(user_agent="solution_app").geocode(address)
-        return (loc.latitude, loc.longitude) if loc else (None, None)
-    except Exception:
-        return (None, None)
+SEPARATOR = '<div style="margin:0.8rem 0;border-bottom:1px solid rgba(0,0,0,0.1);"></div>'
 
 # --- HTML Generators ---
 def _wrap_html(html: str, max_width: int = 900):
@@ -324,34 +316,60 @@ def render_image_section(images_urls: list, uploaded_images=None, saved_files_pa
     if has_url_images:
         render_url_images(images_urls, images_style)
     if has_uploaded_images:
-        render_uploaded_images(uploaded_images, images_style)
+        render_uploaded_images(uploaded_images if uploaded_images is not None else [], images_style)
     if has_saved_images:
-        render_saved_images(saved_files_paths, images_style)
+        render_saved_images(saved_files_paths or [], images_style)
 
 def render_url_images(images_urls: list, images_style: str):
     """
-    Affiche les images depuis les URLs.
+    Affiche les images depuis les URLs avec gestion robuste.
     Args:
         images_urls (list): Liste des URLs d'images
         images_style (str): Style CSS pour les images
     """
-    images_html = ''
-    for img_url in images_urls:
-        if isinstance(img_url, str) and img_url.strip() and img_url.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file']:
-            if img_url.startswith('http'):
-                images_html += f'''
+    def _render_single_url_image(img_url: str, images_style: str):
+        try:
+            st.markdown(f'''
+            <div style="{images_style}">
                 <div style="margin-bottom:12px;text-align:center;">
                     <div style="font-size:0.8rem;color:{THEME["primary"]};font-weight:600;margin-bottom:6px;">Image depuis URL</div>
-                    <img src="{img_url}" style="max-width:100%;max-height:300px;object-fit:contain;border-radius:8px;box-shadow:0 4px 15px rgba(0,114,178,0.15);border:1px solid rgba(0,114,178,0.1);" alt="Image solution"/>
                 </div>
-                '''
-    if images_html:
-        section_html = f'''
-        <div style="{images_style}">
-            {images_html}
-        </div>
-        '''
-        st.markdown(section_html, unsafe_allow_html=True)
+            </div>
+            ''', unsafe_allow_html=True)
+            _, col2, _ = st.columns([0.5, 4, 0.5])
+            with col2:
+                try:
+                    st.image(img_url, use_container_width=True, caption="Image de la solution")
+                except Exception:
+                    st.error(f"Impossible de charger l'image depuis l'URL: {img_url}")
+                    st.markdown(f'''
+                    <div style="border:1px solid #ddd; border-radius:8px; padding:15px; text-align:center; background-color:#f9f9f9; margin-top: 10px;">
+                        <p style="margin-bottom:12px; font-size:0.9rem; color:#333;">L'image n'a pu être affichée directement.</p>
+                        <a href="{img_url}" target="_blank" style="display: inline-block; color: #fff; background-color: #0072B2; text-decoration: none; font-weight: bold; padding: 8px 16px; border-radius: 5px;">
+                            🔗 Voir l'image dans un nouvel onglet
+                        </a>
+                    </div>
+                    ''', unsafe_allow_html=True)
+        except Exception:
+            st.error(f"Erreur lors du traitement de l'URL: {img_url}")
+            st.info("Astuce : Assurez-vous que l'URL pointe directement vers un fichier image (.jpg, .png, .gif, etc.)")
+            st.markdown(f'''
+            <a href="{img_url}" target="_blank" style="display: inline-block; color: #fff; background-color: #0072B2; text-decoration: none; font-weight: bold; padding: 8px 16px; border-radius: 5px;">
+                🔗 Ouvrir l'URL dans un nouvel onglet
+            </a>
+            ''', unsafe_allow_html=True)
+
+    if not images_urls:
+        return
+
+    for img_url in images_urls:
+        if (
+            isinstance(img_url, str)
+            and img_url.strip()
+            and img_url.strip().lower() not in ['-', 'nan', 'aucun', 'none', 'uploaded_file']
+            and img_url.startswith('http')
+        ):
+            _render_single_url_image(img_url, images_style)
 
 def render_uploaded_images(uploaded_images: list, images_style: str):
     """
@@ -401,7 +419,7 @@ def render_saved_images(saved_files_paths: list, images_style: str):
                 )
             st.markdown('</div>', unsafe_allow_html=True)
 
-def render_section(title: str, bg: str = None):
+def render_section(title: str, bg: str = ""):
     """
     Titre de section professionnel avec transparence simple pour présentation client.
     Args:
@@ -413,14 +431,14 @@ def render_section(title: str, bg: str = None):
         st.session_state['section_count'] = 0
     st.session_state['section_count'] += 1
     
-    # Espacement entre les sections
+    # Espacement réduit entre les sections
     if st.session_state['section_count'] > 1:
-        st.markdown('<div style="margin:2rem 0 1.5rem 0;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin:1rem 0 0.5rem 0;"></div>', unsafe_allow_html=True)
     
     # Titre de section professionnel avec transparence simple
     section_style = (
         f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-        'padding:16px 24px;margin-bottom:1rem;text-align:center;'
+        'padding:12px 20px;margin-bottom:0.8rem;text-align:center;'
         f'box-shadow:{THEME["glass_shadow"]};'
         'transition:all 0.3s ease;'
         'position:relative;'
@@ -461,7 +479,7 @@ def _validate_dataframe(df_sol: pd.DataFrame) -> tuple[bool, str]:
     
     return True, solution_column
 
-def _setup_sidebar_inputs(solutions: list) -> tuple[str, list, any]:
+def _setup_sidebar_inputs(solutions: list) -> tuple[str, list, Any]:
     """
     Configure les éléments d'entrée de la sidebar.
     
@@ -472,7 +490,10 @@ def _setup_sidebar_inputs(solutions: list) -> tuple[str, list, any]:
         tuple: (selected_solution, image_urls, uploaded_images)
     """
     # Sélection de la solution
-    selected = st.sidebar.selectbox('Choisissez une solution', solutions, key='select_solution')
+    if solutions and len(solutions) > 0:
+        selected = st.sidebar.selectbox('Choisissez une solution', solutions, key='select_solution')
+    else:
+        selected = ""
     cookies['solution_selected'] = json.dumps([selected])
     
     # Section d'ajout d'images
@@ -507,9 +528,12 @@ def _setup_sidebar_inputs(solutions: list) -> tuple[str, list, any]:
         key=f'uploaded_images_{st.session_state["file_uploader_key"]}'
     )
     
+    # S'assurer que selected est toujours une chaîne de caractères
+    if selected is None:
+        selected = ""
     return selected, image_urls, uploaded_images
 
-def _handle_image_persistence(selected: str, image_urls: list, uploaded_images: any) -> tuple[list, list]:
+def _handle_image_persistence(selected: str, image_urls: list, uploaded_images: Any) -> tuple[list, list]:
     """
     Gère la persistance des images (sauvegarde et récupération).
     
@@ -537,6 +561,8 @@ def _handle_image_persistence(selected: str, image_urls: list, uploaded_images: 
             save_persistent_images(selected, [], new_uploaded_images)
             persistent_urls, persistent_files = get_persistent_images(selected)
             # Réinitialiser le file_uploader
+            if 'file_uploader_key' not in st.session_state:
+                st.session_state['file_uploader_key'] = 0
             st.session_state['file_uploader_key'] += 1
             st.rerun()
     
@@ -597,7 +623,12 @@ def _render_file_deletion_buttons(persistent_files: list, selected: str):
                 updated_files = [f for j, f in enumerate(persistent_files) if j != i]
                 cookie_key_files = f"solution_images_files_{selected}"
                 cookies[cookie_key_files] = json.dumps(updated_files)
+                
+                # Assurer que la clé existe avant de l'incrémenter
+                if 'file_uploader_key' not in st.session_state:
+                    st.session_state['file_uploader_key'] = 0
                 st.session_state['file_uploader_key'] += 1
+                
                 st.sidebar.success("Fichier supprimé !")
                 st.rerun()
 
@@ -625,7 +656,12 @@ def _render_global_deletion_button(persistent_urls: list, persistent_files: list
         cookie_key_files = f"solution_images_files_{selected}"
         cookies[cookie_key_urls] = json.dumps([])
         cookies[cookie_key_files] = json.dumps([])
+        
+        # Assurer que la clé existe avant de l'incrémenter
+        if 'file_uploader_key' not in st.session_state:
+            st.session_state['file_uploader_key'] = 0
         st.session_state['file_uploader_key'] += 1
+        
         st.sidebar.success("Toutes les images supprimées !")
         st.rerun()
 
@@ -728,60 +764,6 @@ def _collect_all_images(info: pd.Series, persistent_urls: list, image_urls: list
     
     return images_urls
 
-def _render_main_content(selected: str, info: pd.Series, desc: str, url_site: str, video: str, 
-                        images_urls: list, persistent_files: list, uploaded_images: any,
-                        df_sol: pd.DataFrame, solution_column: str):
-    """
-    Affiche le contenu principal de la page.
-    
-    Args:
-        selected (str): Solution sélectionnée
-        info (pd.Series): Données de la solution
-        desc (str): Description de la solution
-        url_site (str): URL du site web
-        video (str): URL de la vidéo
-        images_urls (list): Liste des URLs d'images
-        persistent_files (list): Liste des fichiers persistants
-        uploaded_images (any): Images uploadées
-        df_sol (pd.DataFrame): DataFrame des solutions
-        solution_column (str): Nom de la colonne solution
-    """
-    # Header
-    render_header('Fiche solution')
-    st.markdown(SEPARATOR, unsafe_allow_html=True)
-    
-    # Vérifier s'il y a des images
-    has_images = bool(images_urls) or bool(uploaded_images) or bool(persistent_files)
-    
-    # Section Description + Nom/Logo (2 colonnes)
-    col_left, col_right = st.columns([1, 1])
-    
-    with col_left:
-        render_section('Description')
-        desc_style = (
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-            'padding:20px 24px;margin-bottom:1.5rem;'
-            f'box-shadow:{THEME["glass_shadow"]};'
-            'transition:all 0.3s ease;position:relative;overflow:hidden;'
-        )
-        desc_html = f'''
-        <div style="{desc_style}">
-            <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
-        </div>
-        '''
-        st.markdown(desc_html, unsafe_allow_html=True)
-    
-    with col_right:
-        render_logo_and_name(selected, '', '#0072B2', url_site, video)
-    
-    st.markdown(SEPARATOR, unsafe_allow_html=True)
-    
-    # Section Informations + Images (adaptative)
-    if has_images:
-        _render_info_with_images(df_sol, solution_column, info, images_urls, persistent_files)
-    else:
-        _render_info_without_images(df_sol, solution_column, info)
-
 def _render_info_with_images(df_sol: pd.DataFrame, solution_column: str, info: pd.Series, 
                            images_urls: list, persistent_files: list):
     """
@@ -850,7 +832,7 @@ def _render_info_cards(fields: list, info: pd.Series, start_index: int = 0):
         
     cards_container_style = (
         f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-        'padding:20px 24px;margin-bottom:1.5rem;'
+        'padding:16px 20px;margin-bottom:1rem;'
         f'box-shadow:{THEME["glass_shadow"]};'
         'transition:all 0.3s ease;position:relative;overflow:hidden;'
     )
@@ -867,8 +849,8 @@ def _render_info_cards(fields: list, info: pd.Series, start_index: int = 0):
                 'position:relative;overflow:hidden;'
             )
             cards += f'''<div style="{card_style}">
-                <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
-                <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
+                <strong style="font-size:0.85rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{f}</strong>
+                <div style="font-size:1.1rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
             </div>'''
     
     if cards:
@@ -876,6 +858,29 @@ def _render_info_cards(fields: list, info: pd.Series, start_index: int = 0):
             <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
         </div>'''
         st.markdown(grid_section_html, unsafe_allow_html=True)
+
+def _render_description_section(desc: str):
+    """
+    Affiche la section description de la solution.
+    
+    Args:
+        desc (str): Description de la solution
+    """
+    render_section('Description')
+    desc_style = (
+        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+        'padding:16px 20px;margin-bottom:1rem;'
+        f'box-shadow:{THEME["glass_shadow"]};'
+        'transition:all 0.3s ease;'
+        'position:relative;'
+        'overflow:hidden;'
+    )
+    desc_html = f'''
+    <div style="{desc_style}">
+        <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
+    </div>
+    '''
+    st.markdown(desc_html, unsafe_allow_html=True)
 
 def _render_technical_section(info: pd.Series):
     """
@@ -919,49 +924,6 @@ def _render_technical_section(info: pd.Series):
     </div>
     '''
     st.markdown(info_html, unsafe_allow_html=True)
-
-def _render_location_section(info: pd.Series):
-    """
-    Affiche la section de localisation si applicable.
-    """
-    location_fields = [key for key in info.keys() if any(word in key.lower() 
-                      for word in ['localisation', 'adresse', 'siège', 'address', 'location'])]
-    
-    if not location_fields:
-        return
-    
-    st.markdown(SEPARATOR, unsafe_allow_html=True)
-    render_section('Localisation')
-    
-    addr = info.get(location_fields[0], '')
-    if not isinstance(addr, str) or not addr.strip() or addr.strip().lower() in ['-', 'nan', 'aucun', 'none']:
-        return
-    
-    with st.spinner('Géocodage de l\'adresse en cours...'):
-        lat, lon = geocode(addr)
-    
-    if lat and lon:
-        df_map = pd.DataFrame([{'lat': lat, 'lon': lon, 'name': 'Localisation'}])
-        layer = pdk.Layer(
-            'ScatterplotLayer', df_map, get_position='[lon,lat]', get_radius=1000,
-            get_color=[0,114,178], pickable=True, tooltip=True
-        )
-        view = pdk.ViewState(latitude=lat, longitude=lon, zoom=7)
-        st.pydeck_chart(pdk.Deck(initial_view_state=view, layers=[layer], 
-                                tooltip={"text": "{name} : [{lat}, {lon}]"}), use_container_width=True)
-    else:
-        error_style = (
-            'background:rgba(248, 215, 218, 0.8);border:1px solid rgba(220, 53, 69, 0.4);border-radius:12px;'
-            'padding:16px 24px;margin-bottom:1.5rem;text-align:center;'
-            'box-shadow:0 4px 16px rgba(220, 53, 69, 0.15);'
-            'transition:all 0.3s ease;position:relative;overflow:hidden;'
-        )
-        error_html = f'''
-        <div style="{error_style}">
-            <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
-        </div>
-        '''
-        st.markdown(error_html, unsafe_allow_html=True)
 
 def _apply_page_styles():
     """
@@ -1035,7 +997,7 @@ def display(df_sol: pd.DataFrame):
     solutions = df_sol[solution_column].dropna().unique()
     
     # Configuration des éléments d'entrée de la sidebar
-    selected, image_urls, uploaded_images = _setup_sidebar_inputs(solutions)
+    selected, image_urls, uploaded_images = _setup_sidebar_inputs(list(solutions))
     
     # Récupération des informations de la solution sélectionnée
     info = df_sol[df_sol[solution_column] == selected].iloc[0]
@@ -1054,11 +1016,26 @@ def display(df_sol: pd.DataFrame):
     # Collecte de toutes les images
     images_urls = _collect_all_images(info, persistent_urls, image_urls)
     
-    # Affichage du contenu principal
-    _render_main_content(selected, info, desc, url_site, video, 
-                        images_urls, persistent_files, uploaded_images,
-                        df_sol, solution_column)
+    # Affichage du header avec le nom de la solution
+    render_header('Fiche solution')
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
     
-    # Affichage des sections techniques et de localisation
-    _render_technical_section(info)
-    _render_location_section(info)
+    # Création de deux colonnes pour description et nom de la solution
+    col_desc, col_name = st.columns([1, 1])
+    
+    with col_desc:
+        # Affichage de la description
+        _render_description_section(desc)
+    
+    with col_name:
+        # Affichage du nom de la solution avec boutons (comme dans entreprise)
+        render_logo_and_name(selected, info.get('URL (logo)', ''), THEME['accent'], url_site, video)
+    
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+    
+    # Affichage du contenu principal
+    # Si des images sont disponibles, afficher avec images, sinon sans images
+    if images_urls or persistent_files:
+        _render_info_with_images(df_sol, solution_column, info, images_urls, persistent_files)
+    else:
+        _render_info_without_images(df_sol, solution_column, info)

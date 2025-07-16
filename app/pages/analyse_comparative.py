@@ -62,7 +62,7 @@ def display(all_dfs):
     
     # Filtrer les données selon les critères sélectionnés
     df_filtered_criteria = _filter_data_by_criteria(df_filtered, selected_categories, selected_exigences)
-    if df_filtered_criteria.empty:
+    if df_filtered_criteria is None or df_filtered_criteria.empty:
         st.warning("Aucune donnée ne correspond aux critères sélectionnés.")
         return
     
@@ -205,8 +205,26 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
         selected_entreprises (list): Liste des entreprises sélectionnées
     """
     st.markdown("### Grille d'évaluation")
-    df_display = df_filtered.copy()
+    df_display = _format_scores_for_display(df_filtered, selected_entreprises)
+    display_df = _prepare_display_dataframe(df_display, selected_entreprises)
+    grid_options, custom_css = _build_aggrid_options(display_df, selected_entreprises)
+    grid_response = AgGrid(
+        display_df,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        fit_columns_on_grid_load=True,
+        height=900,
+        width='100%',
+        allow_unsafe_jscode=True,
+        theme="balham",
+        custom_css=custom_css,
+        enable_enterprise_modules=True
+    )
+    _display_selected_infos(grid_response, df_filtered, selected_entreprises)
 
+def _format_scores_for_display(df_filtered, selected_entreprises):
+    """Formatte les scores des entreprises en icônes pour l'affichage."""
+    df_display = df_filtered.copy()
     def format_score_icons(value):
         str_value = str(value)
         if str_value in ["1", "1.0"]:
@@ -217,25 +235,17 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
             return "⚠️"
         else:
             return "❓"
-
     for col in selected_entreprises:
         if col in df_display.columns:
             df_display[col] = df_display[col].apply(format_score_icons)
+    return df_display
 
-    # --- Configuration AgGrid pour le rendu HTML des pastilles ---
-    from st_aggrid import JsCode
-    cell_renderer_js = JsCode("""
-        function(params) {
-            return params.value;
-        }
-    """)
-
-    # Colonnes à afficher : Fonctionnalité + entreprises sélectionnées
+def _prepare_display_dataframe(df_display, selected_entreprises):
+    """Prépare le DataFrame à afficher dans AgGrid."""
     info_cols = [df_display.columns[1]]  # Fonctionnalités uniquement
     columns_to_display = info_cols + selected_entreprises
     display_df = df_display[columns_to_display].copy()
     display_df.columns = [COL_FONCTIONNALITE if col == COL_FONCTIONNALITES else col for col in display_df.columns]
-    # Affichage HTML pour les pastilles
     st.markdown("""
     <style>
     .ag-cell span {
@@ -243,15 +253,22 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
     }
     </style>
     """, unsafe_allow_html=True)
-
-    # Ajout colonne de sélection pour AgGrid (à gauche uniquement)
     SELECTION_COL = "Sélection"
     display_df.insert(0, SELECTION_COL, False)
+    return display_df
 
+def _build_aggrid_options(display_df, selected_entreprises):
+    """Construit les options et le CSS personnalisés pour AgGrid."""
+    from st_aggrid import JsCode
+    cell_renderer_js = JsCode("""
+        function(params) {
+            return params.value;
+        }
+    """)
     gb = GridOptionsBuilder.from_dataframe(display_df)
+    SELECTION_COL = "Sélection"
     gb.configure_selection(selection_mode="multiple", use_checkbox=True)
     gb.configure_column(SELECTION_COL, header_name="", width=32, pinned=True, cellStyle={"textAlign": "center"})
-    # Largeur, alignement et rendu HTML pour les colonnes entreprises
     for col in display_df.columns:
         if col != SELECTION_COL:
             if col in selected_entreprises:
@@ -270,9 +287,7 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
                     width=120,
                     cellStyle={"textAlign": "center", "fontSize": "20px", "paddingTop": "8px"}
                 )
-    # Hauteur des lignes
     gb.configure_grid_options(rowHeight=50)
-    # Couleur header et alternance lignes
     gb.configure_grid_options(headerHeight=45)
     gb.configure_grid_options(
         defaultColDef={
@@ -280,7 +295,6 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
         }
     )
     grid_options = gb.build()
-
     custom_css = {
         ".ag-header-cell-label": {
             "background": "#2c3e50",
@@ -318,41 +332,34 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
             "box-shadow": "0 4px 8px rgba(0,0,0,0.15)"
         }
     }
+    return grid_options, custom_css
 
-    grid_response = AgGrid(
-        display_df,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
-        fit_columns_on_grid_load=True,
-        height=600,
-        allow_unsafe_jscode=True,
-        theme="balham",
-        custom_css=custom_css,
-        enable_enterprise_modules=True
-    )
-
+def _display_selected_infos(grid_response, df_filtered, selected_entreprises):
+    """Affiche les informations complémentaires pour les lignes sélectionnées."""
     selected_rows = grid_response["selected_rows"]
-    # Correction : conversion explicite si DataFrame
     if isinstance(selected_rows, pd.DataFrame):
         selected_rows = selected_rows.to_dict(orient="records")
-    # Afficher l'information complémentaire pour toutes les lignes sélectionnées
     if selected_rows:
         st.markdown("---")
         for row in selected_rows:
             selected_fonctionnalite = row[COL_FONCTIONNALITE]
-            st.markdown(f"### Informations complémentaires pour : {selected_fonctionnalite}")
-            # Retrouver la ligne d'origine dans df_filtered
             idx = df_filtered[df_filtered[COL_FONCTIONNALITES] == selected_fonctionnalite].index[0]
             row_data = df_filtered.iloc[idx]
-            for entreprise in selected_entreprises:
-                info_complementaire = _get_info_complementaire(row_data, entreprise, df_filtered)
-                st.markdown(f"**{entreprise}** :")
-                if info_complementaire and info_complementaire.strip() != NO_INFO_MESSAGE:
+            infos_to_display = _get_infos_to_display(row_data, selected_entreprises, df_filtered)
+            if infos_to_display:
+                st.markdown(f"### Informations complémentaires pour : {selected_fonctionnalite}")
+                for entreprise, info_complementaire in infos_to_display:
+                    st.markdown(f"**{entreprise}** :")
                     st.info(info_complementaire)
-                else:
-                    st.warning(NO_INFO_MESSAGE)
 
-    # (Bloc doublon supprimé : affichage déjà géré ci-dessus)
+def _get_infos_to_display(row_data, selected_entreprises, df_filtered):
+    """Retourne la liste des tuples (entreprise, info_complementaire) à afficher."""
+    infos_to_display = []
+    for entreprise in selected_entreprises:
+        info_complementaire = _get_info_complementaire(row_data, entreprise, df_filtered)
+        if info_complementaire and info_complementaire.strip() != NO_INFO_MESSAGE:
+            infos_to_display.append((entreprise, info_complementaire))
+    return infos_to_display
 
 
 def _show_detail_card(row_data, entreprise_name, df_filtered):

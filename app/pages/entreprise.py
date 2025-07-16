@@ -2,7 +2,11 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import json
+import requests
+import io
 from geopy.geocoders import Nominatim
+
+LOGO_CAPTION = "Logo de l'entreprise"
 from sidebar import cookies, apply_sidebar_styles
 
 # --- Visual Theme avec Transparence Simple ---
@@ -27,13 +31,17 @@ THEME = {
 }
 
 HR = '<hr style="margin:1.5rem 0 1rem 0; border:none; border-top:2px solid #e3f0fa;" />'
-SEPARATOR = '<div style="margin:1.2rem 0;border-bottom:1px solid rgba(0,0,0,0.1);"></div>'
+SEPARATOR = '<div style="margin:0.8rem 0;border-bottom:1px solid rgba(0,0,0,0.1);"></div>'
 
 # --- Caching Geocoder ---
+from geopy.extra.rate_limiter import RateLimiter
+
 @st.cache_data(show_spinner=False)
 def geocode(address: str):
     try:
-        loc = Nominatim(user_agent="entreprise_app").geocode(address)
+        geolocator = Nominatim(user_agent="entreprise_app")
+        geocode_sync = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+        loc = geocode_sync(address)
         return (loc.latitude, loc.longitude) if loc else (None, None)
     except Exception:
         return (None, None)
@@ -131,7 +139,9 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     
     st.markdown(_wrap_html(card, 600), unsafe_allow_html=True)
 
-def render_section(title: str, bg: str = None):
+from typing import Optional
+
+def render_section(title: str, bg: Optional[str] = None):
     """
     Titre de section professionnel avec transparence simple pour présentation client.
     Args:
@@ -143,14 +153,14 @@ def render_section(title: str, bg: str = None):
         st.session_state['section_count'] = 0
     st.session_state['section_count'] += 1
     
-    # Espacement entre les sections
+    # Espacement réduit entre les sections
     if st.session_state['section_count'] > 1:
-        st.markdown('<div style="margin:2rem 0 1.5rem 0;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin:1rem 0 0.5rem 0;"></div>', unsafe_allow_html=True)
     
     # Titre de section professionnel avec transparence simple
     section_style = (
         f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-        'padding:16px 24px;margin-bottom:1rem;text-align:center;'
+        'padding:12px 20px;margin-bottom:0.8rem;text-align:center;'
         f'box-shadow:{THEME["glass_shadow"]};'
         'transition:all 0.3s ease;'
         'position:relative;'
@@ -167,24 +177,330 @@ def reset_section_counter():
     """Réinitialise le compteur de section pour l'affichage harmonisé des titres de section."""
     st.session_state['section_count'] = 0
 
+# --- Fonctions d'aide pour la section Logo (sorties de render_logo_section) ---
+
+def is_valid_logo(logo_img):
+    # Exclure les valeurs nulles, nan
+    if logo_img is None or pd.isna(logo_img):
+        return False
+    
+    # Accepter les images binaires (bytes) extraites d'Excel
+    if isinstance(logo_img, bytes):
+        st.sidebar.write("Image binaire valide détectée")
+        return True
+    
+    # Convertir en string pour vérification
+    str_val = str(logo_img).strip()
+    
+    # Exclure les chaînes d'erreur Excel ou vides
+    if str_val.lower() in ['#value!', '#name?', '#ref!', '#div/0!', '#num!', '#null!', 'nan', '']:
+        st.sidebar.write(f"Erreur Excel ignorée: {str_val}")
+        return False
+    
+    # Accepter les liens SharePoint ou chemins Windows
+    if str_val.startswith(('https://', 'http://', 'C:\\')):
+        st.sidebar.write(f"Lien valide détecté: {str_val}")
+        return True
+    
+    # Exclure les valeurs numériques simples (0, 1, etc.)
+    if str_val.isdigit():
+        st.sidebar.write(f"Valeur numérique ignorée: {str_val}")
+        return False
+    
+    # Accepter toute autre valeur string non vide
+    return True
+
+def download_and_display_image(url):
+    """
+    Tente de télécharger une image depuis une URL et de l'afficher.
+    Retourne True si l'affichage réussit, False sinon.
+    """
+    try:
+        download_url = url
+        # Si c'est un lien de partage SharePoint, on le transforme en lien de téléchargement direct
+        if 'sharepoint.com' in url and '?e=' in url:
+            download_url = url + '&download=1'
+            st.sidebar.write(f"URL SharePoint transformée en: {download_url}")
+        
+        st.sidebar.write(f"Tentative de téléchargement depuis : {download_url}")
+        # Certains liens SharePoint nécessitent un user-agent pour fonctionner
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+        response = requests.get(download_url, headers=headers, stream=True, timeout=10)
+        
+        content_type = response.headers.get('Content-Type', '')
+        if response.status_code == 200 and 'image' in content_type:
+            st.sidebar.write("Téléchargement réussi, affichage de l'image.")
+            image_bytes = io.BytesIO(response.content)
+            st.image(image_bytes, width=150, caption=LOGO_CAPTION)
+            return True
+        else:
+            st.sidebar.write(f"Échec du téléchargement direct. Status: {response.status_code}, Content-Type: {response.headers.get('Content-Type')}")
+            return False
+    except requests.exceptions.RequestException as e:
+        st.sidebar.write(f"Erreur lors du téléchargement de l'image : {e}")
+        return False
+
+def try_display_image(img_src):
+    st.sidebar.write(f"Tentative d'affichage image pour : {img_src}")
+    
+    if 'sharepoint.com' in str(img_src):
+        st.sidebar.write("Détection lien SharePoint. Tentative de téléchargement.")
+        
+        # Tenter de télécharger et d'afficher l'image
+        if download_and_display_image(img_src):
+            return True
+        
+        # Si le téléchargement échoue, afficher le lien cliquable comme solution de secours
+        st.sidebar.write("Le téléchargement a échoué. Affichage du lien cliquable comme solution de secours.")
+        try:
+            st.markdown(f'''
+                <div style="border:1px solid #ddd; border-radius:8px; padding:15px; text-align:center; background-color:#f9f9f9; margin-top: 10px;">
+                    <p style="margin-bottom:12px; font-size:0.9rem; color:#333;">Le logo n'a pu être affiché directement.</p>
+                    <a href="{img_src}" target="_blank" style="display: inline-block; color: #fff; background-color: #0072B2; text-decoration: none; font-weight: bold; padding: 8px 16px; border-radius: 5px;">
+                        🔗 Voir le logo sur SharePoint
+                    </a>
+                </div>
+            ''', unsafe_allow_html=True)
+            return True
+        except Exception as e:
+            st.sidebar.write(f"Erreur lors de l'affichage du lien cliquable de secours: {e}")
+            return False
+    try:
+        st.image(img_src, width=120, caption=LOGO_CAPTION, use_container_width=False)
+        st.sidebar.write("Image standard affichée avec succès.")
+        return True
+    except Exception as e:
+        st.sidebar.write(f"Erreur image standard: {e}")
+        return False
+
+def extract_url_from_text(text):
+    import re
+    patterns = [
+        r'https?://[^\s<>"{}|\\^`\[\]]+',
+        r'C:\\[^\s<>"{}|^`\[\]]+'
+    ]
+    for pattern in patterns:
+        url_match = re.search(pattern, text)
+        if url_match:
+            url = url_match.group()
+            st.sidebar.write(f"URL/Chemin extrait: {url}")
+            return url
+    return None
+
+def display_logo_from_str(logo_str):
+    st.sidebar.write(f"Traitement string: {logo_str}")
+    if logo_str.startswith(('https://', 'http://', 'C:\\')):
+        st.sidebar.write("Cas 1: Lien direct ou chemin")
+        return try_display_image(logo_str)
+    if 'http' in logo_str.lower():
+        st.sidebar.write("Cas 2: Texte contenant URL")
+        extracted_url = extract_url_from_text(logo_str)
+        if extracted_url:
+            return try_display_image(extracted_url)
+    st.sidebar.write("Aucun cas de traitement de string trouvé")
+    return False
+
+def display_logo_from_object(logo_img):
+    if isinstance(logo_img, bytes):
+        st.sidebar.write("Image bytes détectée (extraite d'Excel)")
+        try:
+            st.image(logo_img, width=150, caption=LOGO_CAPTION)
+            st.sidebar.write("Affichage image bytes réussi")
+            return True
+        except Exception as e:
+            st.sidebar.write(f"Erreur affichage image bytes: {e}")
+            return False
+    
+    # Cas 2: Objet avec méthode read() (file-like object)
+    if hasattr(logo_img, 'read'):
+        st.sidebar.write("Objet file-like détecté")
+        return try_display_image(logo_img)
+    
+    # Cas 3: Bytearray
+    if isinstance(logo_img, bytearray):
+        st.sidebar.write("Bytearray détecté")
+        return try_display_image(logo_img)
+    
+    # Cas 4: PIL Image (si disponible)
+    try:
+        from PIL import Image
+        if isinstance(logo_img, Image.Image):
+            st.sidebar.write("PIL Image détecté")
+            return try_display_image(logo_img)
+    except ImportError:
+        st.sidebar.write("PIL/Pillow non installé, impossible de traiter l'objet PIL.")
+    
+    st.sidebar.write("Aucun type d'objet image reconnu")
+    return False
+
+def display_logo(logo_img):
+    st.sidebar.write(f"Vérification validité logo: {logo_img} (type: {type(logo_img)})")
+    
+    # D'abord, vérifier si c'est une image binaire (bytes) extraite d'Excel
+    if isinstance(logo_img, bytes):
+        st.sidebar.write("Image binaire détectée - traitement direct")
+        return display_logo_from_object(logo_img)
+    
+    # Ensuite, traiter comme une chaîne de caractères (URL, chemin, etc.)
+    logo_str = str(logo_img).strip()
+    
+    # Ignorer complètement les erreurs Excel
+    if logo_str in ['#VALUE!', '#NAME?', '#REF!', '#DIV/0!', '#NUM!', '#NULL!']:
+        st.sidebar.write(f"Erreur Excel ignorée: {logo_str}")
+        return False
+    
+    if logo_str.isdigit() and logo_str in ['0', '1']:
+        st.sidebar.write(f"Valeur numérique simple ignorée: {logo_str}")
+        return False
+    
+    if not is_valid_logo(logo_img):
+        st.sidebar.write("Logo invalide ou vide")
+        return False
+    
+    if display_logo_from_str(logo_str):
+        return True
+    
+    return display_logo_from_object(logo_img)
+
 # --- Main Display ---
-def display(df_ent: pd.DataFrame):
-    # Appliquer les styles modernes à la sidebar
-    apply_sidebar_styles()
-    
-    # Réinitialiser le compteur de section à chaque affichage (avant tout appel à render_section)
-    reset_section_counter()
-    
-    # Sidebar: select company
+def sidebar_setup(df_ent):
     companies = df_ent['Entreprises'].dropna().unique()
     selected = st.sidebar.selectbox('Choisissez une entreprise', companies, key='select_entreprise')
     cookies['entreprise_selected'] = json.dumps([selected])
     info = df_ent[df_ent['Entreprises'] == selected].iloc[0]
-
-    # Colors
     color = st.sidebar.color_picker('Couleur principale', THEME['accent'])
+    fields = [c for c in df_ent.columns if c not in ['Entreprises','Description','URL (logo)','URL (vidéo)','Logo']]
+    selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_entreprise')
+    return selected, info, color, selected_fields
 
-    # Style CSS pour un rendu professionnel avec transparence simple
+def render_left_column(info, selected_fields):
+    render_section('Informations générales')
+    cards_container_style = (
+        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+        'padding:16px 20px;margin-bottom:1rem;'
+        f'box-shadow:{THEME["glass_shadow"]};'
+        'transition:all 0.3s ease;'
+        'position:relative;'
+        'overflow:hidden;'
+    )
+    cards = ''
+    for i, f in enumerate(selected_fields):
+        val = info.get(f, 'N/A')
+        card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
+        card_style = (
+            f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+            'padding:14px 18px;margin:0 0 12px 0;width:100%;'
+            f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
+            'position:relative;overflow:hidden;'
+        )
+        cards += f'''<div style="{card_style}">
+            <strong style="font-size:0.85rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{f}</strong>
+            <div style="font-size:1.1rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
+        </div>'''
+    grid_section_html = f'''<div style="{cards_container_style}">
+        <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
+    </div>'''
+    st.markdown(grid_section_html, unsafe_allow_html=True)
+
+def get_url_site(info):
+    url_site = ''
+    for key in info.keys():
+        if 'site' in key.lower() and 'web' in key.lower():
+            val = info.get(key, '')
+            if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
+                url_site = val.strip()
+                break
+        if key.strip().lower() == 'website':
+            val = info.get(key, '')
+            if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
+                url_site = val.strip()
+                break
+    return url_site
+
+def render_logo_section(selected, info, color, url_site, video):
+    logo_img = info.get('Logo', None)
+    
+    # Debugging initial
+    st.sidebar.write(f"--- Debug Logo pour {selected} ---")
+    st.sidebar.write(f"Valeur brute: {repr(logo_img)}")
+
+    logo_displayed = display_logo(logo_img)
+
+    if logo_displayed:
+        st.markdown(
+            f"<h2 style='text-align:center;font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;'>{selected}</h2>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.sidebar.write("Affichage du logo de secours (render_logo_and_name)")
+        render_logo_and_name(selected, info.get('URL (logo)', ''), color, url_site, video)
+
+def render_description_section(info):
+    render_section('Description')
+    desc = info.get('Description', '')
+    if not isinstance(desc, str) or not desc.strip():
+        desc = "Aucune description disponible."
+    desc_style = (
+        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
+        'padding:16px 20px;margin-bottom:1rem;'
+        f'box-shadow:{THEME["glass_shadow"]};'
+        'transition:all 0.3s ease;'
+        'position:relative;'
+        'overflow:hidden;'
+    )
+    desc_html = f'''
+    <div style="{desc_style}">
+        <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
+    </div>
+    '''
+    st.markdown(desc_html, unsafe_allow_html=True)
+
+def render_map_section(info):
+    render_section('Localisation')
+    addr = info.get('Localisation (Siège social)', '')
+    with st.spinner('Géocodage de l\'adresse en cours...'):
+        lat, lon = geocode(addr)
+    if lat and lon:
+        df_map = pd.DataFrame([{'lat': lat, 'lon': lon, 'name': 'Siège'}])
+        layer = pdk.Layer(
+            'ScatterplotLayer',
+            df_map,
+            get_position='[lon,lat]',
+            get_radius=1000,
+            get_color=[0,114,178],
+            pickable=True
+        )
+        view = pdk.ViewState(latitude=lat, longitude=lon, zoom=7)
+        deck = pdk.Deck(
+            initial_view_state=view,
+            layers=[layer],
+            # ignore incorrect type stub for tooltip dict
+            tooltip={"text": "{name} : [{lat}, {lon}]"},  # type: ignore[arg-type]
+        )
+        st.pydeck_chart(
+            deck,
+            use_container_width=True
+        )
+    else:
+        error_style = (
+            'background:rgba(248, 215, 218, 0.8);border:1px solid rgba(220, 53, 69, 0.4);border-radius:12px;'
+            'padding:12px 20px;margin-bottom:1rem;text-align:center;'
+            'box-shadow:0 4px 16px rgba(220, 53, 69, 0.15);'
+            'transition:all 0.3s ease;'
+            'position:relative;'
+            'overflow:hidden;'
+        )
+        error_html = f'''
+        <div style="{error_style}">
+            <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
+        </div>
+        '''
+        st.markdown(error_html, unsafe_allow_html=True)
+
+def display(df_ent: pd.DataFrame):
+    apply_sidebar_styles()
+    reset_section_counter()
+    selected, info, color, selected_fields = sidebar_setup(df_ent)
     st.markdown("""
     <style>
     .main .block-container {
@@ -194,7 +510,6 @@ def display(df_ent: pd.DataFrame):
         position: relative;
         min-height: 100vh;
     }
-    
     .main .block-container::before {
         content: '';
         position: fixed;
@@ -208,168 +523,39 @@ def display(df_ent: pd.DataFrame):
         pointer-events: none;
         z-index: -1;
     }
-    
-    /* Transparence pour les éléments flottants */
     .stSelectbox > div > div {
         background: rgba(255, 255, 255, 0.8) !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 8px !important;
         box-shadow: 0 2px 12px rgba(255,255,255,0.08) !important;
     }
-    
     .stMultiSelect > div > div {
         background: rgba(255, 255, 255, 0.8) !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 8px !important;
         box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
     }
-    
     .stColorPicker > div > div {
         background: rgba(255, 255, 255, 0.8) !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 8px !important;
         box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
     }
-    
-    /* Sidebar avec transparence */
     .css-1d391kg {
         background: rgba(255, 255, 255, 0.85) !important;
     }
     </style>
     """, unsafe_allow_html=True)
-
-    # Header en haut de la page
     render_header('Fiche entreprise')
-    
-    # Ligne séparatrice fine après le header
     st.markdown(SEPARATOR, unsafe_allow_html=True)
-
-    # Mise en page en deux colonnes : Informations générales à gauche, Contenu principal à droite
     col_left, col_right = st.columns([1, 1])
-    
-    # Colonne gauche : Informations générales
     with col_left:
-        # Info Cards professionnelles avec transparence simple
-        render_section('Informations générales')
-        fields = [c for c in df_ent.columns if c not in ['Entreprises','Description','URL (logo)','URL (vidéo)']]
-        selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_entreprise')
-        
-        # Conteneur professionnel pour les cartes avec transparence simple
-        cards_container_style = (
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-            'padding:20px 24px;margin-bottom:1.5rem;'
-            f'box-shadow:{THEME["glass_shadow"]};'
-            'transition:all 0.3s ease;'
-            'position:relative;'
-            'overflow:hidden;'
-        )
-        
-        cards = ''
-        for i, f in enumerate(selected_fields):
-            val = info.get(f, 'N/A')
-            card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
-            card_style = (
-                f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-                'padding:14px 18px;margin:0 0 12px 0;width:100%;'
-                f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
-                'position:relative;overflow:hidden;'
-            )
-            cards += f'''<div style="{card_style}">
-                <strong style="font-size:0.9rem;font-weight:800;color:{THEME["primary"]};display:block;margin-bottom:6px;">{f}</strong>
-                <div style="font-size:0.9rem;color:#000;font-weight:600;">{val}</div>
-            </div>'''
-        
-        grid_section_html = f'''<div style="{cards_container_style}">
-            <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
-        </div>'''
-        st.markdown(grid_section_html, unsafe_allow_html=True)
-    
-    # Colonne droite : Logo/Nom, Description, Localisation
+        render_left_column(info, selected_fields)
     with col_right:
-        # Logo, nom, boutons dans la carte premium avec transparence simple
-        url_site = ''
-        for key in info.keys():
-            if 'site' in key.lower() and 'web' in key.lower():
-                val = info.get(key, '')
-                if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
-                    url_site = val.strip()
-                    break
-            if key.strip().lower() == 'website':
-                val = info.get(key, '')
-                if isinstance(val, str) and val.strip() and val.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
-                    url_site = val.strip()
-                    break
+        url_site = get_url_site(info)
         video = info.get('URL (vidéo)', '')
-        render_logo_and_name(selected, info.get('URL (logo)', ''), color, url_site, video)
-
-        # Ligne séparatrice fine entre le conteneur logo/nom/boutons et la section Description
+        render_logo_section(selected, info, color, url_site, video)
         st.markdown(SEPARATOR, unsafe_allow_html=True)
-
-        # Section Description avec transparence simple
-        render_section('Description')
-        desc = info.get('Description', '')
-        if not isinstance(desc, str) or not desc.strip():
-            desc = "Aucune description disponible."
-        
-        # Section Description professionnelle avec transparence simple
-        desc_style = (
-            f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
-            'padding:20px 24px;margin-bottom:1.5rem;'
-            f'box-shadow:{THEME["glass_shadow"]};'
-            'transition:all 0.3s ease;'
-            'position:relative;'
-            'overflow:hidden;'
-        )
-        desc_html = f'''
-        <div style="{desc_style}">
-            <div style="font-size:0.95rem;line-height:1.5;color:#000;text-align:justify;border-left:4px solid {THEME["primary"]};padding-left:16px;font-weight:500;">{desc}</div>
-        </div>
-        '''
-        st.markdown(desc_html, unsafe_allow_html=True)
-
-        # Ligne séparatrice fine entre la description et la localisation
+        render_description_section(info)
         st.markdown(SEPARATOR, unsafe_allow_html=True)
-        
-        # Carte de localisation améliorée avec transparence simple
-        render_section('Localisation')
-        addr = info.get('Localisation (Siège social)', '')
-        
-        with st.spinner('Géocodage de l\'adresse en cours...'):
-            lat, lon = geocode(addr)
-        
-        if lat and lon:
-            df_map = pd.DataFrame([{'lat': lat, 'lon': lon, 'name': 'Siège'}])
-            layer = pdk.Layer(
-                'ScatterplotLayer',
-                df_map,
-                get_position='[lon,lat]',
-                get_radius=1000,
-                get_color=[0,114,178],
-                pickable=True,
-                tooltip=True
-            )
-            view = pdk.ViewState(latitude=lat, longitude=lon, zoom=7)
-            st.pydeck_chart(
-                pdk.Deck(
-                    initial_view_state=view,
-                    layers=[layer],
-                    tooltip={"text": "{name} : [{lat}, {lon}]"}
-                ),
-                use_container_width=True
-            )
-        else:
-            # Message d'erreur dans un conteneur avec transparence simple
-            error_style = (
-                'background:rgba(248, 215, 218, 0.8);border:1px solid rgba(220, 53, 69, 0.4);border-radius:12px;'
-                'padding:16px 24px;margin-bottom:1.5rem;text-align:center;'
-                'box-shadow:0 4px 16px rgba(220, 53, 69, 0.15);'
-                'transition:all 0.3s ease;'
-                'position:relative;'
-                'overflow:hidden;'
-            )
-            error_html = f'''
-            <div style="{error_style}">
-                <p style="margin:0;font-size:1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
-            </div>
-            '''
-            st.markdown(error_html, unsafe_allow_html=True)
+        render_map_section(info)

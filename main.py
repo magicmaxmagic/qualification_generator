@@ -128,6 +128,10 @@ df_comp, df_ent, df_align, df_sol = load_from_bytes(
     uploaded_file.name, uploaded_file.getvalue()
 )
 
+# Ajouter la section PDF téléchargement après le chargement des données
+with st.sidebar:
+    sidebar.add_pdf_download_section(df_ent, df_sol, df_comp, df_align)
+
 
 # -----------------------------------------------------------------------------
 # 7) Dispatch selon la page
