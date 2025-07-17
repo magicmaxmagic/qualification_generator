@@ -220,7 +220,6 @@ elif page == "Assistant IA":
 # 8) Section d'export PDF à la fin de la sidebar
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("---")
     sidebar.add_pdf_download_section(df_ent, df_sol, df_comp, df_align)
 
 # -----------------------------------------------------------------------------

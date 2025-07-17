@@ -28,6 +28,9 @@ try:
     WEASYPRINT_AVAILABLE = True
 except ImportError:
     WEASYPRINT_AVAILABLE = False
+except Exception:
+    # Gestion d'erreur étendue pour les problèmes de bibliothèques système
+    WEASYPRINT_AVAILABLE = False
 
 # Détection de l'environnement cloud au niveau module
 import os
@@ -1797,18 +1800,23 @@ def generate_pdf_from_html(html_content):
         # Essayer avec WeasyPrint d'abord
         if WEASYPRINT_AVAILABLE:
             try:
-                pdf_bytes = HTML(string=html_content).write_pdf()
+                # Test de disponibilité des bibliothèques avant utilisation
+                from weasyprint import HTML as WeasyHTML
+                pdf_bytes = WeasyHTML(string=html_content).write_pdf()
                 return pdf_bytes
             except Exception as e:
-                error_msg = str(e)
-                if "libpango" in error_msg or "shared object" in error_msg:
-                    st.warning("⚠️ Bibliothèques système manquantes (libpango). Essai avec méthode alternative...")
+                error_msg = str(e).lower()
+                if any(lib in error_msg for lib in ["libpango", "libcairo", "libffi", "shared object", "ctypes"]):
+                    st.warning("⚠️ Bibliothèques système manquantes pour WeasyPrint (libpango, libcairo). Tentative avec pdfkit...")
+                elif "fontconfig" in error_msg:
+                    st.warning("⚠️ Configuration des polices manquante. Tentative avec pdfkit...")
                 else:
-                    st.warning(f"Erreur WeasyPrint: {error_msg}")
+                    st.warning(f"⚠️ Erreur WeasyPrint: {error_msg}")
         
         # Fallback avec pdfkit
         if PDFKIT_AVAILABLE:
             try:
+                import pdfkit as pdf_kit
                 MARGIN = '0.75in'
                 options = {
                     'page-size': 'A4',
@@ -1818,27 +1826,49 @@ def generate_pdf_from_html(html_content):
                     'margin-left': MARGIN,
                     'encoding': "UTF-8",
                     'no-outline': None,
-                    'enable-local-file-access': None
+                    'enable-local-file-access': None,
+                    'quiet': ''
                 }
-                pdf_bytes = pdfkit.from_string(html_content, False, options=options)
+                pdf_bytes = pdf_kit.from_string(html_content, False, options=options)
                 return pdf_bytes
             except Exception as e:
                 error_msg = str(e)
                 if "wkhtmltopdf" in error_msg:
-                    st.warning("⚠️ wkhtmltopdf non disponible sur cette plateforme.")
+                    st.warning("⚠️ wkhtmltopdf non installé sur cette plateforme.")
+                elif "No such file or directory" in error_msg:
+                    st.warning("⚠️ Exécutable wkhtmltopdf introuvable.")
                 else:
-                    st.warning(f"Erreur pdfkit: {error_msg}")
+                    st.warning(f"⚠️ Erreur pdfkit: {error_msg}")
         
         # Si aucune bibliothèque n'est disponible ou si toutes ont échoué
-        st.info("💡 Export PDF indisponible sur cette plateforme. Utilisez l'export HTML puis convertissez avec votre navigateur (Ctrl+P → Enregistrer en PDF).")
+        st.info("""
+        💡 **Export PDF indisponible sur cette plateforme**
+        
+        **Solution de contournement :**
+        1. Utilisez l'export HTML
+        2. Ouvrez le fichier HTML dans votre navigateur
+        3. Utilisez Ctrl+P (ou Cmd+P sur Mac)
+        4. Sélectionnez "Enregistrer en PDF"
+        
+        Cette méthode produit d'excellents résultats PDF.
+        """)
         return None
         
     except Exception as e:
-        error_msg = str(e)
-        if "libpango" in error_msg or "shared object" in error_msg:
-            st.info("ℹ️ Bibliothèques système manquantes pour PDF. Exportez en HTML puis convertissez avec votre navigateur.")
+        error_msg = str(e).lower()
+        if any(lib in error_msg for lib in ["libpango", "libcairo", "libffi", "shared object", "ctypes"]):
+            st.error("""
+            ❌ **Bibliothèques système manquantes**
+            
+            Cette plateforme ne dispose pas des bibliothèques nécessaires pour l'export PDF.
+            
+            **Solution recommandée :**
+            1. Cliquez sur "HTML" pour télécharger le rapport HTML
+            2. Ouvrez le fichier dans votre navigateur
+            3. Imprimez avec Ctrl+P → "Enregistrer en PDF"
+            """)
         else:
-            st.error(f"Erreur lors de la génération PDF: {error_msg}")
+            st.error(f"❌ Erreur lors de la génération PDF: {error_msg}")
         return None
 
 def generate_report_pdf(df_ent, df_sol, df_comp, df_align=None):
