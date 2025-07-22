@@ -1,4 +1,5 @@
 import streamlit as st
+from sidebar import show_sidebar
 import pandas as pd
 import pydeck as pdk
 import json
@@ -6,6 +7,31 @@ import requests
 import io
 from geopy.geocoders import Nominatim
 
+"""
+=== CONSTANTES GLOBALES (labels, colonnes, messages, titres, etc.) ===
+"""
+LABEL_ENTREPRISES = "Entreprises"
+LABEL_DESCRIPTION = "Description"
+LABEL_URL_LOGO = "URL (logo)"
+LABEL_URL_VIDEO = "URL (vidéo)"
+LABEL_LOGO = "Logo"
+LABEL_SITE_WEB = "Site web"
+LABEL_LOCALISATION = "Localisation (Siège social)"
+LABEL_FICHE_ENTREPRISE = "Fiche entreprise"
+LABEL_CHAMPS_VISIBLES = "Champs visibles"
+LABEL_COULEUR_PRINCIPALE = "Couleur principale"
+LABEL_CHOISISSEZ_ENTREPRISE = "Choisissez une entreprise"
+LABEL_AUCUNE_DESCRIPTION = "Aucune description disponible."
+LABEL_AUCUNE_LOCALISATION = "Aucune colonne de localisation trouvée dans les données."
+LABEL_ADRESSE_NON_GEOCODEE = "Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie."
+LABEL_INFOS_GENERALES = "Informations générales"
+LABEL_LOCALISATION_SECTION = "Localisation"
+LABEL_SIEGE_SOCIAL = "Siège social"
+LABEL_NA = "N/A"
+LABEL_LOGO_FALLBACK = "Logo"
+LABEL_BOUTON_VIDEO = "Vidéo"
+LABEL_BOUTON_VOIR_LOGO = "Voir le logo sur SharePoint"
+LABEL_LOGO_NON_AFFICHE = "Le logo n'a pu être affiché directement."
 LOGO_CAPTION = "Logo de l'entreprise"
 from sidebar import cookies, apply_sidebar_styles
 
@@ -38,11 +64,17 @@ from geopy.extra.rate_limiter import RateLimiter
 
 @st.cache_data(show_spinner=False)
 def geocode(address: str):
+    import time
     try:
         geolocator = Nominatim(user_agent="entreprise_app")
-        geocode_sync = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+        # Timeout fixé à 5 secondes
+        start = time.time()
+        geocode_sync = RateLimiter(lambda addr: geolocator.geocode(addr), min_delay_seconds=1)
         loc = geocode_sync(address)
-        return (loc.latitude, loc.longitude) if loc else (None, None)
+        elapsed = time.time() - start
+        if elapsed > 5 or loc is None:
+            return (None, None)
+        return (loc.latitude, loc.longitude)
     except Exception:
         return (None, None)
 
@@ -119,24 +151,17 @@ def render_logo_and_name(name: str, logo_url: str, color: str, url_site: str = '
     btns_html = f'<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">{btns}</div>' if btns else ''
 
     # Carte professionnelle compacte avec transparence simple - Structure verticale
-    html = (
-        'display:flex;flex-direction:column;gap:12px;'
-        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-        'padding:16px 20px;max-width:600px;margin:0 auto 1rem auto;'
-        f'box-shadow:{THEME["glass_shadow"]};position:relative;'
-        'transition: all 0.3s ease;'
-    )
-    
-    # Conteneur du haut : Logo + Nom (alignement centré avec gap réduit)
-    top_container = f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><div style="flex-shrink:0;">{logo}</div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;">'
-    top_container += f'<h2 style="font-size:1.7rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>'
-    top_container += '</div></div>'
-    
-    # Conteneur du bas : Boutons
-    bottom_container = f'<div style="display:flex;justify-content:center;width:100%;">{btns_html}</div>' if btns else ''
-    
-    card = f'<div style="{html}">{top_container}{bottom_container}</div>'
-    
+    card = f'''
+    <div style="background:{THEME['glass_bg']};border:1px solid {THEME['glass_border']};border-radius:14px;padding:18px 20px;margin-bottom:1rem;box-shadow:{THEME['glass_shadow']};display:flex;flex-direction:column;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+            {logo}
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;">
+                <h2 style="font-size:1.7rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;word-break:break-word;text-align:center;">{name}</h2>
+            </div>
+        </div>
+        {btns_html}
+    </div>
+    '''
     st.markdown(_wrap_html(card, 600), unsafe_allow_html=True)
 
 from typing import Optional
@@ -331,17 +356,17 @@ def display_logo(logo_img):
 
 # --- Main Display ---
 def sidebar_setup(df_ent):
-    companies = df_ent['Entreprises'].dropna().unique()
-    selected = st.sidebar.selectbox('Choisissez une entreprise', companies, key='select_entreprise')
+    companies = df_ent[LABEL_ENTREPRISES].dropna().unique()
+    selected = st.sidebar.selectbox(LABEL_CHOISISSEZ_ENTREPRISE, companies, key='select_entreprise')
     cookies['entreprise_selected'] = json.dumps([selected])
-    info = df_ent[df_ent['Entreprises'] == selected].iloc[0]
-    color = st.sidebar.color_picker('Couleur principale', THEME['accent'])
-    fields = [c for c in df_ent.columns if c not in ['Entreprises','Description','URL (logo)','URL (vidéo)','Logo']]
-    selected_fields = st.sidebar.multiselect('Champs visibles', fields, default=fields[:4], key='fields_entreprise')
+    info = df_ent[df_ent[LABEL_ENTREPRISES] == selected].iloc[0]
+    color = st.sidebar.color_picker(LABEL_COULEUR_PRINCIPALE, THEME['accent'])
+    fields = [c for c in df_ent.columns if c not in [LABEL_ENTREPRISES, LABEL_DESCRIPTION, LABEL_URL_LOGO, LABEL_URL_VIDEO, LABEL_LOGO]]
+    selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, fields, default=fields[:4], key='fields_entreprise')
     return selected, info, color, selected_fields
 
 def render_left_column(info, selected_fields):
-    render_section('Informations générales')
+    render_section(LABEL_INFOS_GENERALES)
     cards_container_style = (
         f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
         'padding:16px 20px;margin-bottom:1rem;'
@@ -352,7 +377,7 @@ def render_left_column(info, selected_fields):
     )
     cards = ''
     for i, f in enumerate(selected_fields):
-        val = info.get(f, 'N/A')
+        val = info.get(f, LABEL_NA)
         card_bg = THEME['glass_bg'] if i % 2 == 0 else THEME['glass_bg_blue']
         card_style = (
             f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
@@ -385,23 +410,52 @@ def get_url_site(info):
     return url_site
 
 def render_logo_section(selected, info, color, url_site, video):
-    logo_img = info.get('Logo', None)
-    
-    logo_displayed = display_logo(logo_img)
-
-    if logo_displayed:
-        st.markdown(
-            f"<h2 style='text-align:center;font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;'>{selected}</h2>",
-            unsafe_allow_html=True
-        )
+    # Affichage horizontal : logo à gauche, nom à droite, boutons en dessous
+    logo_url = info.get(LABEL_URL_LOGO, None)
+    logo_html = ''
+    if isinstance(logo_url, str) and logo_url.startswith(('http://', 'https://')):
+        logo_html = f"<img src='{logo_url}' width='80' style='border-radius:8px;box-shadow:0 2px 8px rgba(0,114,178,0.08);' alt='{LOGO_CAPTION}'/>"
     else:
-        render_logo_and_name(selected, info.get('URL (logo)', ''), color, url_site, video)
+        logo_html = f"<div style='width:80px;height:80px;border-radius:8px;background:{THEME['glass_bg']};border:1px solid {THEME['glass_border']};display:flex;align-items:center;justify-content:center;color:#000;font-size:14px;font-weight:600;box-shadow:{THEME['glass_shadow']};'>{LABEL_LOGO_FALLBACK}</div>"
+
+    name_html = f"<div style='display:flex;flex-direction:column;justify-content:center;'><h2 style='font-size:1.4rem;font-weight:700;color:#000;margin:0;letter-spacing:-0.01em;line-height:1.1;text-align:center;'>{selected}</h2></div>"
+
+    # Boutons centrés (site web et/ou vidéo)
+    btns = []
+    if isinstance(url_site, str) and url_site.strip() and url_site.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
+        btns.append(f'''<a href="{url_site}" target="_blank" style="text-decoration:none;display:inline-block;margin-right:8px;">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:{THEME['glass_bg']};border:2px solid {THEME['primary']};color:#000;font-weight:600;font-size:0.8rem;padding:6px 12px;border-radius:6px;cursor:pointer;transition:all 0.3s ease;letter-spacing:0.3px;box-shadow:{THEME['glass_shadow']};">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:1px;vertical-align:middle;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            {LABEL_SITE_WEB}
+        </div></a>''')
+    # Affichage du bouton vidéo YouTube même si le site web n'est pas présent
+    if isinstance(video, str) and video.strip() and video.strip().lower() not in ['-', 'nan', 'aucun', 'none']:
+        # On vérifie que c'est bien une URL YouTube
+        video_url = video.strip()
+        if 'youtube.com' in video_url or 'youtu.be' in video_url:
+            btns.append(f'''<a href="{video_url}" target="_blank" style="text-decoration:none;display:inline-block;">
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(220,53,69,0.7);border:2px solid #dc3545;color:#fff;font-weight:600;font-size:0.8rem;padding:6px 12px;border-radius:6px;cursor:pointer;transition:all 0.3s ease;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(220,53,69,0.2);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:1px;vertical-align:middle;"><rect x="2" y="6" width="20" height="12" rx="3" fill="#dc3545"/><polygon points="10,9 16,12 10,15" fill="#fff"/></svg>
+                Vidéo
+            </div></a>''')
+
+    btns_html = '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;">' + ''.join(btns) + '</div>' if btns else ''
+
+    st.markdown(f"""
+    <div style='display:flex;flex-direction:column;align-items:center;width:100%;'>
+        <div style='display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:8px;width:100%;'>
+            {logo_html}
+            {name_html}
+        </div>
+        {btns_html}
+    </div>
+    """, unsafe_allow_html=True)
 
 def render_description_section(info):
-    render_section('Description')
-    desc = info.get('Description', '')
+    render_section(LABEL_DESCRIPTION)
+    desc = info.get(LABEL_DESCRIPTION, '')
     if not isinstance(desc, str) or not desc.strip():
-        desc = "Aucune description disponible."
+        desc = LABEL_AUCUNE_DESCRIPTION
     desc_style = (
         f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:14px;'
         'padding:16px 20px;margin-bottom:1rem;'
@@ -431,7 +485,7 @@ def render_map_section(info):
     # Si toujours aucune colonne, utiliser l'ancienne méthode avec une colonne spécifique
     if not location_columns:
         # Fallback vers la méthode originale
-        addr = info.get('Localisation (Siège social)', '')
+        addr = info.get(LABEL_LOCALISATION, '')
         if addr and str(addr).strip() and str(addr).strip().lower() != 'nan':
             with st.spinner('Géocodage de l\'adresse en cours...'):
                 lat, lon = geocode(str(addr))
@@ -465,7 +519,7 @@ def render_map_section(info):
         )
         error_html = f'''
         <div style="{error_style}">
-            <p style="margin:0;font-size:1.1rem;color:#000;font-weight:600;">Aucune colonne de localisation trouvée dans les données.</p>
+            <p style="margin:0;font-size:1.1rem;color:#000;font-weight:600;">{LABEL_AUCUNE_LOCALISATION}</p>
         </div>
         '''
         st.markdown(error_html, unsafe_allow_html=True)
@@ -543,7 +597,7 @@ def render_map_section(info):
         )
         error_html = f'''
         <div style="{error_style}">
-            <p style="margin:0;font-size:1.1rem;color:#000;font-weight:600;">Adresse non géocodée ou introuvable. Merci de vérifier l'adresse saisie.</p>
+            <p style="margin:0;font-size:1.1rem;color:#000;font-weight:600;">{LABEL_ADRESSE_NON_GEOCODEE}</p>
         </div>
         '''
         st.markdown(error_html, unsafe_allow_html=True)
@@ -551,7 +605,21 @@ def render_map_section(info):
 def display(df_ent: pd.DataFrame):
     apply_sidebar_styles()
     reset_section_counter()
-    selected, info, color, selected_fields = sidebar_setup(df_ent)
+    # Sélection globale d'entreprise(s)
+    if df_ent is None or df_ent.empty or LABEL_ENTREPRISES not in df_ent.columns:
+        st.error("Aucune donnée d'entreprise disponible.")
+        return
+    entreprises = df_ent[LABEL_ENTREPRISES].dropna().unique().tolist()
+    selected = show_sidebar(
+        label=LABEL_CHOISISSEZ_ENTREPRISE,
+        options=entreprises,
+        default=entreprises[:1],
+        multiselect=False
+    )
+    # Filtrer le DataFrame selon la sélection
+    info = df_ent[df_ent[LABEL_ENTREPRISES].isin(selected)].iloc[0] if selected else df_ent.iloc[0]
+    color = THEME['accent']
+    selected_fields = df_ent.columns.tolist()[:4]  # Par défaut, les 4 premiers champs
     st.markdown("""
     <style>
     .main .block-container {
@@ -597,7 +665,7 @@ def display(df_ent: pd.DataFrame):
     }
     </style>
     """, unsafe_allow_html=True)
-    render_header('Fiche entreprise')
+    render_header(LABEL_FICHE_ENTREPRISE)
     st.markdown(SEPARATOR, unsafe_allow_html=True)
     col_left, col_right = st.columns([1, 1])
     with col_left:

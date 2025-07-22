@@ -1,3 +1,49 @@
+# === CONSTANTES GLOBALES (labels, titres, messages, boutons, placeholders, etc.) ===
+LABEL_PAGE_TITLE = "Assistant IA IVÉO"
+LABEL_PAGE_SUBTITLE = "Assistant professionnel pour l'analyse de données"
+LABEL_OPENAI_UNAVAILABLE = "**OpenAI temporairement non disponible** - Conflit de versions détecté"
+LABEL_OPENAI_WARNING = "Clé API requise"
+LABEL_OPENAI_SUCCESS = "API OpenAI configurée"
+LABEL_OPENAI_API_KEY = "Clé API OpenAI"
+LABEL_OPENAI_API_KEY_HELP = "Entrez votre clé API OpenAI pour activer le chatbot"
+LABEL_SIDEBAR_CONFIG = "Configuration IA"
+LABEL_SIDEBAR_PARAMS = "Paramètres"
+LABEL_SIDEBAR_MODEL = "Modèle IA"
+LABEL_SIDEBAR_MODEL_HELP = "Choisissez le modèle OpenAI à utiliser"
+LABEL_SIDEBAR_CREATIVITY = "Créativité"
+LABEL_SIDEBAR_CREATIVITY_HELP = "Contrôle la créativité des réponses"
+LABEL_SIDEBAR_MAX_TOKENS = "Longueur max"
+LABEL_SIDEBAR_MAX_TOKENS_HELP = "Nombre maximum de mots dans la réponse"
+LABEL_SIDEBAR_QUICK_CHAT = "Chat Rapide"
+LABEL_SIDEBAR_QUICK_QUESTION = "Question rapide"
+LABEL_SIDEBAR_QUICK_QUESTION_PLACEHOLDER = "Posez une question courte..."
+LABEL_SIDEBAR_SEND = "Envoyer"
+LABEL_SIDEBAR_ACTIONS = "Actions Rapides"
+LABEL_SIDEBAR_ANALYZE = "Analyser les données"
+LABEL_SIDEBAR_SUGGESTIONS = "Suggestions d'amélioration"
+LABEL_SIDEBAR_CLEAR_HISTORY = "Effacer l'historique"
+LABEL_CHAT_PLACEHOLDER = "Tapez votre question ici..."
+LABEL_CHAT_SEND = "Envoyer"
+LABEL_CHAT_WELCOME = "Bienvenue sur le service d'analyse de données IVÉO. Posez votre question pour démarrer la conversation."
+LABEL_CHAT_ASSISTANT = "assistant"
+LABEL_CHAT_USER = "user"
+LABEL_CHAT_THINKING = "L'IA réfléchit..."
+LABEL_CHAT_CONFIGURE_API = "Veuillez configurer votre clé API OpenAI dans la sidebar."
+LABEL_TEMP_HEADER = "Assistant Temporaire (sans IA)"
+LABEL_TEMP_INFO = "En attendant la correction d'OpenAI, voici ce que je peux vous dire sur vos données :"
+LABEL_TEMP_DATA_SUMMARY = "Résumé des données"
+LABEL_TEMP_SUGGESTIONS = "Suggestions d'analyse"
+LABEL_TEMP_ACTIONS = "Actions recommandées :"
+LABEL_TEMP_REFRESH = "Actualiser les données"
+LABEL_TEMP_FEEDBACK = "Feedback temporaire"
+LABEL_TEMP_FEEDBACK_INPUT = "Décrivez ce que vous cherchez à analyser :"
+LABEL_TEMP_FEEDBACK_PLACEHOLDER = "Ex : Je souhaite comparer les entreprises sur les critères de sécurité..."
+LABEL_TEMP_FEEDBACK_SUCCESS = "Demande enregistrée ! Elle sera traitée une fois l'IA disponible."
+LABEL_TEMP_FEEDBACK_PENDING = "Demandes en attente"
+LABEL_TEMP_FEEDBACK_EXPANDER = "Demande {i} - {timestamp}"
+LABEL_TEMP_FEEDBACK_BUTTON = "Enregistrer la demande"
+LABEL_TEMP_METRIC_ROWS = "Total lignes"
+LABEL_TEMP_METRIC_COLS = "Total colonnes"
 """
 Page Chatbot IA - Application IVÉO BI
 =====================================
@@ -31,15 +77,18 @@ from sidebar import apply_sidebar_styles
 def init_openai():
     """Initialise l'API OpenAI avec la clé fournie par l'utilisateur."""
     global openai_client
-    
+
     if not OPENAI_AVAILABLE:
         return False
-        
+
     if "openai_api_key" not in st.session_state:
         st.session_state.openai_api_key = ""
-    
+
     if st.session_state.openai_api_key:
         try:
+            global openai_client
+            # Import OpenAI class inside the function to avoid issues if openai is not installed
+            from openai import OpenAI
             openai_client = OpenAI(api_key=st.session_state.openai_api_key)
             return True
         except Exception as e:
@@ -73,13 +122,13 @@ def _init_chat_history():
         st.session_state.chat_messages = []
 
 def _render_header():
-    st.title("Assistant IA IVÉO")
-    st.markdown("### Assistant professionnel pour l'analyse de données")
+    st.title(LABEL_PAGE_TITLE)
+    st.markdown(f"### {LABEL_PAGE_SUBTITLE}")
 
 def _render_openai_unavailable(all_dfs):
-    st.warning("**OpenAI temporairement non disponible** - Conflit de versions détecté")
+    st.warning(LABEL_OPENAI_UNAVAILABLE)
     st.markdown("""
-    ### �️ **Solution rapide** :
+    ### **Solution rapide** :
     
     **Problème** : Conflit entre les versions `openai` et `httpx`
     
@@ -211,6 +260,7 @@ def _render_header_styled():
     st.markdown('<div class="chat-header">Assistant IA IVÉO</div>', unsafe_allow_html=True)
     st.markdown("<div style='text-align:center; font-size:1.1rem; color:#444; margin-bottom:18px;'>Service d'analyse de données professionnelle</div>", unsafe_allow_html=True)
 
+
 def _setup_sidebar_chat(all_dfs):
     """Configure le chatbot dans la sidebar."""
     with st.sidebar:
@@ -308,16 +358,16 @@ def _render_main_chat():
     """Affiche l'interface de chat principale."""
     # Zone de chat
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    
+
     # Afficher l'historique des messages
     if not st.session_state.chat_messages:
         st.markdown(
-            '<div class="assistant-message">Bienvenue sur le service d\'analyse de données IVÉO. Posez votre question pour démarrer la conversation.</div>',
+            f'<div class="assistant-message">{LABEL_CHAT_WELCOME}</div>',
             unsafe_allow_html=True
         )
-    
+
     for message in st.session_state.chat_messages:
-        if message["role"] == "user":
+        if message["role"] == LABEL_CHAT_USER or message["role"] == "user":
             st.markdown(
                 f'<div class="user-message">{message["content"]}</div>',
                 unsafe_allow_html=True
@@ -327,149 +377,77 @@ def _render_main_chat():
                 f'<div class="assistant-message">{message["content"]}</div>',
                 unsafe_allow_html=True
             )
-    
+
     st.markdown('</div>', unsafe_allow_html=True)
-    
+
     # Zone de saisie
     col1, col2 = st.columns([5, 1])
-    
+
     with col1:
         user_input = st.text_input(
             "Votre message",
-            placeholder="Tapez votre question ici...",
+            placeholder=LABEL_CHAT_PLACEHOLDER,
             key="main_chat_input",
             label_visibility="collapsed"
         )
-    
     with col2:
-        send_button = st.button("Envoyer", key="main_send", use_container_width=True)
-    
+        send_button = st.button(LABEL_CHAT_SEND, key="main_send", use_container_width=True)
+
     # Traitement de l'envoi
     if (send_button or user_input) and user_input:
-        # Ajouter le message de l'utilisateur
         st.session_state.chat_messages.append({
-            "role": "user",
+            "role": LABEL_CHAT_USER,
             "content": user_input,
             "timestamp": datetime.now().isoformat()
         })
-        # Tenter la connexion et l'appel à l'API
         if not init_openai():
             st.session_state.chat_messages.append({
-                "role": "assistant",
-                "content": "Veuillez configurer votre clé API OpenAI dans la sidebar.",
+                "role": LABEL_CHAT_ASSISTANT,
+                "content": LABEL_CHAT_CONFIGURE_API,
                 "timestamp": datetime.now().isoformat()
             })
             return
-        with st.spinner("🤔 L'IA réfléchit..."):
+        with st.spinner(LABEL_CHAT_THINKING):
             ai_response = _get_ai_response(user_input, st.session_state.get("all_dfs", {}))
-        # Si erreur API, on affiche le message d'erreur mais on n'appelle pas st.rerun()
         st.session_state.chat_messages.append({
-            "role": "assistant",
+            "role": LABEL_CHAT_ASSISTANT,
             "content": ai_response,
             "timestamp": datetime.now().isoformat()
         })
-        # On ne fait st.rerun() que si la réponse n'est pas une erreur
         if ai_response is not None and not ai_response.startswith("Erreur") and not ai_response.startswith("Veuillez"):
             st.rerun()
 
-def _get_ai_response(user_message, all_dfs, is_quick=False):
+def _get_system_context(all_dfs):
     """
-    Obtient une réponse de l'API OpenAI.
-    
-    Args:
-        user_message (str): Message de l'utilisateur
-        all_dfs (dict): DataFrames disponibles
-        is_quick (bool): Si c'est une question rapide
-        
-    Returns:
-        str: Réponse de l'IA
-    """
-    if not OPENAI_AVAILABLE:
-        return "OpenAI n'est pas disponible. Veuillez installer la librairie."
-        
-    try:
-        # Contexte système
-        system_context = _build_system_context(all_dfs)
-        
-        # Préparer les messages
-        messages = [
-            {"role": "system", "content": system_context}
-        ]
-        
-        # Ajouter l'historique récent si ce n'est pas une question rapide
-        if not is_quick and st.session_state.chat_messages:
-            recent_messages = st.session_state.chat_messages[-6:]  # 6 derniers messages
-            for msg in recent_messages:
-                messages.append({
-                    "role": msg["role"],
-                    "content": msg["content"]
-                })
-        
-        # Ajouter le message actuel
-        messages.append({"role": "user", "content": user_message})
-        
-        # Appel à l'API OpenAI
-        if openai_client is None:
-            return "Client OpenAI non initialisé. Vérifiez votre clé API."
-            
-        # Convertir les messages au format requis par OpenAI
-        formatted_messages = []
-        for msg in messages:
-            if msg["role"] == "system":
-                formatted_messages.append({"role": "system", "content": msg["content"]})
-            elif msg["role"] == "user":
-                formatted_messages.append({"role": "user", "content": msg["content"]})
-            elif msg["role"] == "assistant":
-                formatted_messages.append({"role": "assistant", "content": msg["content"]})
-            else:
-                formatted_messages.append({"role": "user", "content": msg["content"]})
+    Génère le contexte système pour l'IA en fonction des DataFrames disponibles.
 
-        response = openai_client.chat.completions.create(
-            model=st.session_state.get("selected_model", "gpt-3.5-turbo"),
-            messages=formatted_messages,
-            temperature=st.session_state.get("temperature", 0.7),
-            max_tokens=st.session_state.get("max_tokens", 500)
-        )
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        return f"Erreur lors de la communication avec l'IA : {str(e)}"
-
-def _build_system_context(all_dfs):
-    """
-    Construit le contexte système pour l'IA.
-    
     Args:
         all_dfs (dict): DataFrames disponibles
-        
+
     Returns:
         str: Contexte système
     """
     context = """
     Tu es un assistant IA expert en analyse de données pour l'application IVÉO BI.
-    
+
     CONTEXTE :
     - Tu aides les utilisateurs à analyser et comprendre leurs données business
     - Tu peux répondre aux questions sur les analyses comparatives, les entreprises, et les solutions
     - Tu fournis des insights actionables et des recommandations
-    
+
     STYLE DE COMMUNICATION :
     - Sois professionnel mais accessible
     - Utilise des emojis appropriés pour rendre la conversation engageante
     - Fournis des réponses structurées et claires
-    - Suggère des actions concrètes quand c'est pertinent
-    
-    DONNÉES DISPONIBLES :
     """
-    
+
     # Ajouter des informations sur les données disponibles
     if all_dfs:
         context += "\nFeuilles de données disponibles :\n"
         for sheet_name, df in all_dfs.items():
             if df is not None and not df.empty:
                 context += f"- {sheet_name}: {len(df)} lignes, {len(df.columns)} colonnes\n"
-    
+
     context += """
     
     CAPACITÉS :
@@ -478,11 +456,46 @@ def _build_system_context(all_dfs):
     - Interprétation des métriques
     - Aide à la prise de décision
     - Explication des tendances
-    
+
     Réponds toujours en français et reste dans le contexte de l'analyse business et des données IVÉO.
     """
-    
+
     return context
+
+def _get_ai_response(user_message, all_dfs, is_quick=False):
+    """
+    Envoie la requête à OpenAI et retourne la réponse du chatbot.
+
+    Args:
+        user_message (str): Message de l'utilisateur
+        all_dfs (dict): DataFrames disponibles
+        is_quick (bool): Si la requête vient du chat rapide
+
+    Returns:
+        str: Réponse de l'IA ou message d'erreur
+    """
+    if not OPENAI_AVAILABLE or openai_client is None:
+        return "Erreur : OpenAI n'est pas disponible. Veuillez vérifier la configuration."
+    try:
+        # Préparer le contexte système
+        system_context = _get_system_context(all_dfs)
+        messages = [
+            {"role": "system", "content": system_context},
+            {"role": "user", "content": user_message}
+        ]
+        model = st.session_state.get("selected_model", "gpt-3.5-turbo")
+        temperature = st.session_state.get("temperature", 0.7)
+        max_tokens = st.session_state.get("max_tokens", 500)
+        response = openai_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        content = response.choices[0].message.content
+        return content.strip() if content is not None else ""
+    except Exception as e:
+        return f"Erreur lors de la génération de la réponse : {str(e)}"
 
 def _add_system_message(action_description, all_dfs):
     """Ajoute un message système basé sur une action rapide."""

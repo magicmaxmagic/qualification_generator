@@ -15,6 +15,8 @@ import base64
 from datetime import datetime
 import json
 from sidebar import cookies
+from weasyprint import HTML
+
 
 # Imports pour l'export PDF avec gestion d'erreurs
 try:
@@ -24,7 +26,6 @@ except ImportError:
     PDFKIT_AVAILABLE = False
 
 try:
-    from weasyprint import HTML
     WEASYPRINT_AVAILABLE = True
 except ImportError:
     WEASYPRINT_AVAILABLE = False
@@ -41,6 +42,66 @@ IS_CLOUD_ENV = (
     os.getenv('RAILWAY_ENVIRONMENT') is not None or
     os.getenv('VERCEL') is not None
 )
+
+
+# =================== VARIABLES D'ÉTAT ET MESSAGES ===================
+MSG_MISSING_LIBS = "Bibliothèques système manquantes pour WeasyPrint (libpango, libcairo). Tentative avec pdfkit..."
+MSG_MISSING_FONTCONFIG = "Configuration des polices manquante. Tentative avec pdfkit..."
+MSG_WEASYPRINT_ERROR = "Erreur WeasyPrint: {}"
+MSG_PDFKIT_MISSING = "wkhtmltopdf non installé sur cette plateforme."
+MSG_PDFKIT_NOT_FOUND = "Exécutable wkhtmltopdf introuvable."
+MSG_PDFKIT_ERROR = "Erreur pdfkit: {}"
+MSG_PDF_EXPORT_UNAVAILABLE = "L'export PDF n'est pas disponible sur cette plateforme."
+MSG_PDF_EXPORT_FATAL = "Erreur fatale lors de l'export PDF (bibliothèques système manquantes)."
+MSG_PDF_EXPORT_ERROR = "❌ Erreur lors de la génération PDF: {}"
+MSG_REPORT_GEN_ERROR = "Erreur lors de la génération du rapport : {}"
+
+# Titres et labels globaux
+TITLE_REPORT = "Rapport IVÉO - Analyse Comparative"
+META_DESCRIPTION = "Rapport d'analyse comparative IVÉO - Intelligence d'affaires"
+META_AUTHOR = "IVÉO"
+META_GENERATOR = "IVÉO BI Platform"
+TITLE_HEADER = "Rapport d'Analyse Comparative"
+LABEL_META = "Intelligence d'Affaires • Analyse Stratégique"
+LABEL_GENERATED_ON = "Généré le {}"
+TITLE_TOC = "Table des matières"
+TOC_ITEMS = [
+    ("resume", "Résumé exécutif"),
+    ("entreprises", "Analyse des entreprises"),
+    ("solutions", "Analyse des solutions"),
+    ("comparative", "Analyse comparative"),
+    ("recommandations", "Recommandations stratégiques"),
+    ("methodologie", "Méthodologie"),
+    ("annexes", "Annexes")
+]
+TITLE_EXEC_SUMMARY = "1. Résumé exécutif"
+TITLE_COMPANIES = "2. Analyse des entreprises"
+TITLE_SOLUTIONS = "3. Analyse des solutions"
+TITLE_COMPARATIVE = "4. Analyse comparative"
+TITLE_RECOMMENDATIONS = "5. Recommandations stratégiques"
+TITLE_METHODOLOGY = "6. Méthodologie"
+TITLE_ANNEXES = "7. Annexes"
+LABEL_NO_COMPANY_DATA = "Aucune donnée d'entreprise disponible."
+LABEL_NO_SOLUTION_DATA = "Aucune donnée de solution disponible."
+LABEL_NO_COMPARATIVE_DATA = "Aucune donnée d'analyse comparative disponible avec les filtres actuels."
+LABEL_COMPANIES_ANALYSED = "Entreprises analysées"
+LABEL_SECTORS = "Secteurs représentés"
+LABEL_SOLUTIONS_ANALYSED = "Solutions analysées"
+LABEL_IMAGES_ASSOCIATED = "Images associées"
+LABEL_CRITERIA = "Critères évalués"
+LABEL_DOMAINS = "Domaines"
+LABEL_COMPANIES = "Entreprises"
+LABEL_FILTERS = "Filtres appliqués"
+LABEL_NO_COMPANY = "Aucune entreprise à afficher."
+LABEL_NO_SOLUTION_COLUMN = "Aucune colonne de solutions trouvée."
+LABEL_SELECTED_SOLUTION = "Solution sélectionnée :"
+LABEL_NO_SELECTION = "Aucune sélection spécifique"
+LABEL_TABLE_COMPANY = ["Entreprise", "Secteur", "Localisation", "Statut", "Site web"]
+LABEL_TABLE_SOLUTION = ["Solution", "Catégorie", "Fournisseur", "Statut", "Site web"]
+LABEL_YES = "✓ Oui"
+LABEL_NO = "✗ Non"
+LABEL_NA = "-"
+
 
 def _clean_na_value(value):
     """
@@ -90,643 +151,13 @@ def generate_html_report(df_ent, df_sol, df_comp, df_align=None):
     css = """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', Arial, sans-serif;
-            line-height: 1.6;
-            color: #2d3748;
-            background: white;
-            font-size: 13px;
-            padding: 20px;
-        }
-        
-        .report-container {
-            max-width: 210mm;
-            margin: 0 auto;
-            background: white;
-            padding: 0;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #0072B2 0%, #1a8bb8 100%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
-            margin-bottom: 30px;
-            border-radius: 8px;
-        }
-        
-        .header-content {
-            position: relative;
-            z-index: 2;
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .header h2 {
-            font-size: 1.5em;
-            font-weight: 400;
-            margin-bottom: 15px;
-            opacity: 0.95;
-        }
-        
-        .header .meta {
-            font-size: 1em;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-        
-        .section {
-            margin-bottom: 40px;
-            padding: 0;
-            page-break-inside: avoid;
-        }
-        
-        .section h2 {
-            color: #0072B2;
-            font-size: 1.8em;
-            font-weight: 600;
-            margin-bottom: 25px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e3f0fa;
-            page-break-after: avoid;
-        }
-        
-        .section h3 {
-            color: #4a5568;
-            font-size: 1.3em;
-            font-weight: 600;
-            margin: 25px 0 15px 0;
-            page-break-after: avoid;
-        }
-        
-        .section p {
-            margin-bottom: 15px;
-            font-size: 1em;
-            line-height: 1.6;
-            text-align: justify;
-        }
-        
-        .table-container {
-            overflow-x: visible;
-            margin: 20px 0;
-            page-break-inside: avoid;
-            width: 100%;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border: 1px solid #e2e8f0;
-            font-size: 0.8em;
-            page-break-inside: avoid;
-            table-layout: auto;
-        }
-        
-        th {
-            background: #0072B2;
-            color: white;
-            padding: 8px 6px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 0.75em;
-            border-bottom: 2px solid #005a8f;
-            page-break-inside: avoid;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        td {
-            padding: 8px 6px;
-            border-bottom: 1px solid #e2e8f0;
-            border-right: 1px solid #f1f5f9;
-            vertical-align: top;
-            font-size: 0.75em;
-            word-wrap: break-word;
-            max-width: none;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        tr:nth-child(even) {
-            background: #f8fafc;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin: 25px 0;
-            page-break-inside: avoid;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid #e2e8f0;
-            page-break-inside: avoid;
-        }
-        
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: #0072B2;
-        }
-        
-        .stat-number {
-            font-size: 2.5em;
-            font-weight: 700;
-            color: #0072B2;
-            margin-bottom: 8px;
-            line-height: 1;
-        }
-        
-        .stat-label {
-            color: #4a5568;
-            font-size: 0.95em;
-            font-weight: 500;
-            margin: 0;
-        }
-        
-        .company-card {
-            background: white;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            border-left: 4px solid #0072B2;
-            page-break-inside: avoid;
-        }
-        
-        .company-header {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .company-logo {
-            max-width: 80px;
-            max-height: 60px;
-            border-radius: 4px;
-        }
-        
-        .company-title h3 {
-            font-size: 1.4em;
-            font-weight: 700;
-            color: #0072B2;
-            margin: 0 0 5px 0;
-        }
-        
-        .company-title .sector {
-            color: #6b7280;
-            font-size: 1em;
-            font-weight: 500;
-        }
-        
-        .company-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
-        }
-        
-        .detail-item {
-            padding: 10px;
-            background: #f8fafc;
-            border-radius: 4px;
-            border-left: 2px solid #0072B2;
-            font-size: 0.9em;
-        }
-        
-        .detail-item strong {
-            color: #374151;
-            font-weight: 600;
-        }
-        
-        .toc {
-            background: #f8fafc;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            margin-bottom: 25px;
-            page-break-inside: avoid;
-        }
-        
-        .toc h2 {
-            color: #0072B2;
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e3f0fa;
-            padding-bottom: 10px;
-        }
-        
-        .toc ol {
-            padding-left: 20px;
-        }
-        
-        .toc li {
-            margin-bottom: 8px;
-            padding: 5px 0;
-        }
-        
-        .toc a {
-            color: #4a5568;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        
-        .toc a:hover {
-            color: #0072B2;
-        }
-        
-        .executive-summary {
-            background: #f8fafc;
-            padding: 25px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border: 1px solid #e2e8f0;
-            page-break-inside: avoid;
-        }
-        
-        .recommendations {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #10b981;
-            margin: 20px 0;
-            page-break-inside: avoid;
-        }
-        
-        .recommendations h3 {
-            color: #10b981;
-            margin-bottom: 15px;
-        }
-        
-        .recommendations ul {
-            padding-left: 20px;
-        }
-        
-        .recommendations li {
-            margin-bottom: 10px;
-            padding: 5px 0;
-            line-height: 1.5;
-        }
-        
-        .page-break {
-            page-break-before: always;
-        }
-        
-        .footer {
-            background: #f8fafc;
-            padding: 25px;
-            text-align: center;
-            color: #6b7280;
-            font-size: 0.9em;
-            border-top: 1px solid #e2e8f0;
-            margin-top: 40px;
-        }
-        
-        .footer p {
-            margin: 5px 0;
-        }
-        
-        .highlight {
-            background: #e3f0fa;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #0072B2;
-            margin: 15px 0;
-            page-break-inside: avoid;
-        }
-        
-        .image-gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .image-item {
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            text-align: center;
-        }
-        
-        .image-item img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 4px;
-        }
-        
-        /* Optimisations pour l'impression et PDF */
-        @media print {
-            body {
-                font-size: 11px;
-                line-height: 1.4;
-                background: white;
-                padding: 10px;
-                margin: 0;
-            }
-            
-            .report-container {
-                max-width: none;
-                width: 100%;
-                margin: 0;
-                padding: 0;
-            }
-            
-            .section {
-                margin-bottom: 25px;
-                page-break-inside: avoid;
-            }
-            
-            .section h2 {
-                page-break-after: avoid;
-                font-size: 1.5em;
-                margin-bottom: 15px;
-            }
-            
-            .section h3 {
-                page-break-after: avoid;
-                font-size: 1.2em;
-                margin: 15px 0 10px 0;
-            }
-            
-            .table-container {
-                overflow: visible;
-                page-break-inside: avoid;
-                margin: 15px 0;
-                width: 100%;
-            }
-            
-            table {
-                width: 100%;
-                font-size: 0.7em;
-                page-break-inside: avoid;
-                border-collapse: collapse;
-                table-layout: fixed;
-            }
-            
-            th {
-                padding: 6px 4px;
-                font-size: 0.7em;
-                background: #0072B2 !important;
-                color: white !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            td {
-                padding: 6px 4px;
-                font-size: 0.7em;
-                word-wrap: break-word;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: none;
-            }
-            
-            .comparative-table-container {
-                page-break-inside: avoid;
-                width: 100%;
-            }
-            
-            .comparative-table-container table {
-                font-size: 0.65em;
-                width: 100%;
-                table-layout: fixed;
-            }
-            
-            .comparative-table-container th,
-            .comparative-table-container td {
-                padding: 4px 3px;
-                font-size: 0.65em;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 80px;
-            }
-            
-            /* Mode paysage pour les tableaux larges */
-            @page {
-                size: A4;
-                margin: 0.5in;
-            }
-            
-            .landscape-table {
-                page-break-before: always;
-            }
-            
-            .landscape-table table {
-                font-size: 0.6em;
-                width: 100%;
-                table-layout: fixed;
-            }
-            
-            .landscape-table th,
-            .landscape-table td {
-                padding: 3px 2px;
-                font-size: 0.6em;
-                max-width: 60px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .stats-grid {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 10px;
-                margin: 15px 0;
-            }
-            
-            .stat-card {
-                padding: 15px;
-                page-break-inside: avoid;
-            }
-            
-            .company-card {
-                padding: 15px;
-                margin: 15px 0;
-                page-break-inside: avoid;
-            }
-            
-            .header {
-                padding: 25px;
-                margin-bottom: 20px;
-                background: #0072B2 !important;
-                color: white !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .header h1 {
-                font-size: 2em;
-            }
-            
-            .header h2 {
-                font-size: 1.3em;
-            }
-            
-            .cell-yes {
-                background: #d4edda !important;
-                color: #28a745 !important;
-                font-weight: bold;
-                text-align: center;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .cell-no {
-                background: #f8d7da !important;
-                color: #dc3545 !important;
-                font-weight: bold;
-                text-align: center;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .cell-na {
-                background: #f8f9fa !important;
-                color: #6c757d !important;
-                text-align: center;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-        }
-        
-        /* Amélioration de l'affichage des tableaux */
-        .responsive-table {
-            overflow-x: auto;
-            margin: 20px 0;
-            width: 100%;
-        }
-        
-        .responsive-table table {
-            min-width: 100%;
-            font-size: 0.8em;
-            table-layout: auto;
-        }
-        
-        .responsive-table th,
-        .responsive-table td {
-            white-space: nowrap;
-            padding: 8px 6px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 150px;
-        }
-        
-        /* Styles pour les cellules de tableau spécifiques */
-        .cell-yes {
-            background: #d4edda;
-            color: #28a745;
-            font-weight: bold;
-            text-align: center;
-        }
-        
-        .cell-no {
-            background: #f8d7da;
-            color: #dc3545;
-            font-weight: bold;
-            text-align: center;
-        }
-        
-        .cell-na {
-            background: #f8f9fa;
-            color: #6c757d;
-            text-align: center;
-        }
-            
-            .company-card,
-            .stat-card,
-            .table-container,
-            .toc,
-            .executive-summary,
-            .recommendations,
-            .highlight {
-                page-break-inside: avoid;
-            }
-            
-            table {
-                font-size: 0.8em;
-            }
-            
-            th {
-                padding: 8px 6px;
-            }
-            
-            td {
-                padding: 6px 6px;
-                max-width: 120px;
-            }
-            
-            .header {
-                padding: 20px;
-            }
-            
-            .header h1 {
-                font-size: 2em;
-            }
-            
-            .header h2 {
-                font-size: 1.3em;
-            }
-        }
-        
-        /* Responsive pour écrans plus petits */
-        @media screen and (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .company-details {
-                grid-template-columns: 1fr;
-            }
-            
-            .company-header {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            table {
-                font-size: 0.8em;
-            }
-            
-            th, td {
-                padding: 6px 4px;
-            }
-        }
+        * {margin: 0; padding: 0; box-sizing: border-box;}
     </style>
     """
-    
     # Récupérer les données des cookies
     selected_companies = []
+    selected_solution = ""
+    selected_categories = []
     selected_solution = ""
     selected_categories = []
     
@@ -743,18 +174,18 @@ def generate_html_report(df_ent, df_sol, df_comp, df_align=None):
     # Générer le HTML avec une structure améliorée
     html = f"""
     <!DOCTYPE html>
-    <html lang="fr">
+    <html lang=\"fr\">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Rapport IVÉO - Analyse Comparative</title>
-        <meta name="description" content="Rapport d'analyse comparative IVÉO - Intelligence d'affaires">
-        <meta name="author" content="IVÉO">
-        <meta name="generator" content="IVÉO BI Platform">
+        <meta charset=\"UTF-8\">
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+        <title>{TITLE_REPORT}</title>
+        <meta name=\"description\" content=\"{META_DESCRIPTION}\">
+        <meta name=\"author\" content=\"{META_AUTHOR}\">
+        <meta name=\"generator\" content=\"{META_GENERATOR}\">
         {css}
     </head>
     <body>
-        <div class="report-container">
+        <div class=\"report-container\">
             {_generate_header()}
             {_generate_table_of_contents()}
             {_generate_executive_summary(df_ent, df_sol, df_comp)}
@@ -776,13 +207,13 @@ def _generate_header():
     """Génère l'en-tête du rapport avec un design professionnel."""
     date_str = datetime.now().strftime("%d/%m/%Y à %H:%M")
     return f"""
-    <div class="header">
-        <div class="header-content">
-            <h1>IVÉO</h1>
-            <h2>Rapport d'Analyse Comparative</h2>
-            <div class="meta">
-                <p>Intelligence d'Affaires • Analyse Stratégique</p>
-                <p>Généré le {date_str}</p>
+    <div class=\"header\">
+        <div class=\"header-content\">
+            <h1>{META_AUTHOR}</h1>
+            <h2>{TITLE_HEADER}</h2>
+            <div class=\"meta\">
+                <p>{LABEL_META}</p>
+                <p>{LABEL_GENERATED_ON.format(date_str)}</p>
             </div>
         </div>
     </div>
@@ -790,18 +221,13 @@ def _generate_header():
 
 def _generate_table_of_contents():
     """Génère une table des matières professionnelle."""
-    return """
-    <div class="section">
-        <div class="toc">
-            <h2>Table des matières</h2>
+    toc_items_html = ''.join([f'<li><a href="#{anchor}">{label}</a></li>' for anchor, label in TOC_ITEMS])
+    return f"""
+    <div class=\"section\">
+        <div class=\"toc\">
+            <h2>{TITLE_TOC}</h2>
             <ol>
-                <li><a href="#resume">Résumé exécutif</a></li>
-                <li><a href="#entreprises">Analyse des entreprises</a></li>
-                <li><a href="#solutions">Analyse des solutions</a></li>
-                <li><a href="#comparative">Analyse comparative</a></li>
-                <li><a href="#recommandations">Recommandations stratégiques</a></li>
-                <li><a href="#methodologie">Méthodologie</a></li>
-                <li><a href="#annexes">Annexes</a></li>
+                {toc_items_html}
             </ol>
         </div>
     </div>
@@ -809,58 +235,22 @@ def _generate_table_of_contents():
 
 def _generate_executive_summary(df_ent, df_sol, df_comp):
     """Génère un résumé exécutif professionnel avec statistiques et insights."""
-    stats = []
-    
-    # Statistiques principales
-    if df_ent is not None and not df_ent.empty:
-        stats.append(f'<div class="stat-card"><p class="stat-number">{len(df_ent)}</p><p class="stat-label">Entreprises analysées</p></div>')
-    
-    if df_sol is not None and not df_sol.empty:
-        stats.append(f'<div class="stat-card"><p class="stat-number">{len(df_sol)}</p><p class="stat-label">Solutions évaluées</p></div>')
-    
-    if df_comp is not None and not df_comp.empty:
-        stats.append(f'<div class="stat-card"><p class="stat-number">{len(df_comp)}</p><p class="stat-label">Critères d\'évaluation</p></div>')
-    
-    # Statistiques additionnelles
-    if df_ent is not None and not df_ent.empty:
-        secteurs = df_ent.get("Secteur d'activité", pd.Series()).dropna().nunique()
-        if secteurs > 0:
-            stats.append(f'<div class="stat-card"><p class="stat-number">{secteurs}</p><p class="stat-label">Secteurs représentés</p></div>')
-    
-    stats_html = ''.join(stats)
-    
-    # Génération d'insights automatiques
-    insights = []
-    if df_ent is not None and not df_ent.empty:
-        insights.append(f"L'analyse porte sur {len(df_ent)} entreprises représentant une diversité sectorielle significative.")
-    
-    if df_sol is not None and not df_sol.empty:
-        insights.append(f"L'évaluation comprend {len(df_sol)} solutions technologiques répondant à différents besoins organisationnels.")
-    
-    if df_comp is not None and not df_comp.empty:
-        insights.append(f"L'analyse comparative s'appuie sur {len(df_comp)} critères d'évaluation structurés et objectifs.")
-    
-    insights_html = ' '.join(insights)
-    
+    stats_html = _generate_executive_stats_html(df_ent, df_sol, df_comp)
+    insights_html = _generate_executive_insights_html(df_ent, df_sol, df_comp)
+    return _build_executive_summary_html(stats_html, insights_html)
+
+def _build_executive_summary_html(stats_html, insights_html):
+    """Construit le HTML du résumé exécutif à partir des sous-parties."""
     return f"""
-    <div class="section page-break" id="resume">
-        <h2>1. Résumé exécutif</h2>
-        
-        <div class="executive-summary">
-            <div class="stats-grid">
-                {stats_html}
-            </div>
-            
-            <div class="highlight">
+    <div class=\"section page-break\" id=\"resume\">
+        <h2>{TITLE_EXEC_SUMMARY}</h2>
+        <div class=\"executive-summary\">
+            <div class=\"stats-grid\">{stats_html}</div>
+            <div class=\"highlight\">
                 <h3>Contexte et objectifs</h3>
-                <p>
-                    Ce rapport présente une analyse comparative approfondie des solutions et entreprises 
-                    évaluées selon une méthodologie rigoureuse. L'objectif est de fournir une base 
-                    décisionnelle solide pour orienter les choix stratégiques de l'organisation.
-                </p>
+                <p>Ce rapport présente une analyse comparative approfondie des solutions et entreprises évaluées selon une méthodologie rigoureuse. L'objectif est de fournir une base décisionnelle solide pour orienter les choix stratégiques de l'organisation.</p>
                 <p>{insights_html}</p>
             </div>
-            
             <h3>Points clés de l'analyse</h3>
             <ul>
                 <li>Évaluation multi-critères basée sur des indicateurs quantitatifs et qualitatifs</li>
@@ -872,15 +262,37 @@ def _generate_executive_summary(df_ent, df_sol, df_comp):
     </div>
     """
 
+def _generate_executive_stats_html(df_ent, df_sol, df_comp):
+    """Génère le HTML des statistiques pour le résumé exécutif."""
+    stats = []
+    if df_ent is not None and not df_ent.empty:
+        stats.append(f'<div class="stat-card"><p class="stat-number">{len(df_ent)}</p><p class="stat-label">Entreprises analysées</p></div>')
+    if df_sol is not None and not df_sol.empty:
+        stats.append(f'<div class="stat-card"><p class="stat-number">{len(df_sol)}</p><p class="stat-label">Solutions évaluées</p></div>')
+    if df_comp is not None and not df_comp.empty:
+        stats.append(f'<div class="stat-card"><p class="stat-number">{len(df_comp)}</p><p class="stat-label">Critères d\'évaluation</p></div>')
+    if df_ent is not None and not df_ent.empty:
+        secteurs = df_ent.get("Secteur d'activité", pd.Series()).dropna().nunique()
+        if secteurs > 0:
+            stats.append(f'<div class="stat-card"><p class="stat-number">{secteurs}</p><p class="stat-label">Secteurs représentés</p></div>')
+    return ''.join(stats)
+
+def _generate_executive_insights_html(df_ent, df_sol, df_comp):
+    """Génère le HTML des insights automatiques pour le résumé exécutif."""
+    insights = []
+    if df_ent is not None and not df_ent.empty:
+        insights.append(f"L'analyse porte sur {len(df_ent)} entreprises représentant une diversité sectorielle significative.")
+    if df_sol is not None and not df_sol.empty:
+        insights.append(f"L'évaluation comprend {len(df_sol)} solutions technologiques répondant à différents besoins organisationnels.")
+    if df_comp is not None and not df_comp.empty:
+        insights.append(f"L'analyse comparative s'appuie sur {len(df_comp)} critères d'évaluation structurés et objectifs.")
+    return ' '.join(insights)
+
 def _generate_companies_section(df_ent, selected_companies):
     """Génère la section des entreprises avec toutes les informations."""
     if df_ent is None or df_ent.empty:
-        return """
-        <div class="section page-break" id="entreprises">
-            <h2>2. Analyse des entreprises</h2>
-            <p>Aucune donnée d'entreprise disponible.</p>
-        </div>
-        """
+        return f"""
+        <div class=\"section page-break\" id=\"entreprises\">\n            <h2>{TITLE_COMPANIES}</h2>\n            <p>{LABEL_NO_COMPANY_DATA}</p>\n        </div>\n        """
     
     if not selected_companies:
         company_column = df_ent.columns[0]
@@ -913,42 +325,7 @@ def _generate_companies_section(df_ent, selected_companies):
         """)
 
     return f"""
-    <div class="section page-break" id="entreprises">
-        <h2>2. Analyse des entreprises</h2>
-        
-        <div class="stats-grid">
-            <div class="stat-card">
-                <p class="stat-number">{len(selected_companies)}</p>
-                <p class="stat-label">Entreprises analysées</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-number">{len(set(comp['secteur'] for comp in companies_info))}</p>
-                <p class="stat-label">Secteurs représentés</p>
-            </div>
-        </div>
-        
-        <h3>Profils détaillés des entreprises</h3>
-        {companies_html}
-        
-        <h3>Tableau récapitulatif des entreprises</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 25%;">Entreprise</th>
-                        <th style="width: 20%;">Secteur</th>
-                        <th style="width: 20%;">Localisation</th>
-                        <th style="width: 15%;">Statut</th>
-                        <th style="width: 20%;">Site web</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {''.join(table_rows)}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    """
+    <div class=\"section page-break\" id=\"entreprises\">\n        <h2>{TITLE_COMPANIES}</h2>\n        <div class=\"stats-grid\">\n            <div class=\"stat-card\">\n                <p class=\"stat-number\">{len(selected_companies)}</p>\n                <p class=\"stat-label\">{LABEL_COMPANIES_ANALYSED}</p>\n            </div>\n            <div class=\"stat-card\">\n                <p class=\"stat-number\">{len(set(comp['secteur'] for comp in companies_info))}</p>\n                <p class=\"stat-label\">{LABEL_SECTORS}</p>\n            </div>\n        </div>\n        <h3>Profils détaillés des entreprises</h3>\n        {companies_html}\n        <h3>Tableau récapitulatif des entreprises</h3>\n        <div class=\"table-container\">\n            <table>\n                <thead>\n                    <tr>\n                        <th style=\"width: 25%;\">{LABEL_TABLE_COMPANY[0]}</th>\n                        <th style=\"width: 20%;\">{LABEL_TABLE_COMPANY[1]}</th>\n                        <th style=\"width: 20%;\">{LABEL_TABLE_COMPANY[2]}</th>\n                        <th style=\"width: 15%;\">{LABEL_TABLE_COMPANY[3]}</th>\n                        <th style=\"width: 20%;\">{LABEL_TABLE_COMPANY[4]}</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    {''.join(table_rows)}\n                </tbody>\n            </table>\n        </div>\n    </div>\n    """
 
 def _extract_company_details(df_ent, company):
     company_info = df_ent[df_ent.iloc[:, 0] == company]
@@ -1061,12 +438,8 @@ def _generate_companies_summary_table(companies_info):
 def _generate_solutions_section(df_sol, selected_solution):
     """Génère la section des solutions avec toutes les informations et images."""
     if df_sol is None or df_sol.empty:
-        return """
-        <div class="section page-break" id="solutions">
-            <h2>3. Analyse des solutions</h2>
-            <p>Aucune donnée de solution disponible.</p>
-        </div>
-        """
+        return f"""
+        <div class=\"section page-break\" id=\"solutions\">\n            <h2>{TITLE_SOLUTIONS}</h2>\n            <p>{LABEL_NO_SOLUTION_DATA}</p>\n        </div>\n        """
     
     # Trouver la colonne des solutions
     solution_column = None
@@ -1076,12 +449,8 @@ def _generate_solutions_section(df_sol, selected_solution):
             break
     
     if solution_column is None:
-        return """
-        <div class="section page-break" id="solutions">
-            <h2>3. Analyse des solutions</h2>
-            <p>Aucune colonne de solutions trouvée.</p>
-        </div>
-        """
+        return f"""
+        <div class=\"section page-break\" id=\"solutions\">\n            <h2>{TITLE_SOLUTIONS}</h2>\n            <p>{LABEL_NO_SOLUTION_COLUMN}</p>\n        </div>\n        """
     
     # Récupérer les solutions à afficher - TOUTES les solutions disponibles
     solutions_to_show = []
@@ -1232,48 +601,10 @@ def _generate_solutions_section(df_sol, selected_solution):
             """)
     
     table_html = f"""
-    <table>
-        <thead>
-            <tr>
-                <th>Solution</th>
-                <th>Catégorie</th>
-                <th>Fournisseur</th>
-                <th>Statut</th>
-                <th>Site web</th>
-            </tr>
-        </thead>
-        <tbody>
-            {''.join(table_rows)}
-        </tbody>
-    </table>
-    """
+    <table>\n        <thead>\n            <tr>\n                <th>{LABEL_TABLE_SOLUTION[0]}</th>\n                <th>{LABEL_TABLE_SOLUTION[1]}</th>\n                <th>{LABEL_TABLE_SOLUTION[2]}</th>\n                <th>{LABEL_TABLE_SOLUTION[3]}</th>\n                <th>{LABEL_TABLE_SOLUTION[4]}</th>\n            </tr>\n        </thead>\n        <tbody>\n            {''.join(table_rows)}\n        </tbody>\n    </table>\n    """
     
     return f"""
-    <div class="section page-break" id="solutions">
-        <h2>3. Analyse des solutions</h2>
-        
-        <div class="stats-grid">
-            <div class="stat-card">
-                <p class="stat-number">{len(solutions_to_show)}</p>
-                <p class="stat-label">Solutions analysées</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-number">{len(solution_images) if solution_images else 0}</p>
-                <p class="stat-label">Images associées</p>
-            </div>
-        </div>
-        
-        <h3>Détails des solutions</h3>
-        {solutions_html}
-        
-        <h3>Tableau récapitulatif</h3>
-        {table_html}
-        
-        <p>
-            <strong>Solution sélectionnée :</strong> {selected_solution if selected_solution else "Aucune sélection spécifique"}
-        </p>
-    </div>
-    """
+    <div class=\"section page-break\" id=\"solutions\">\n        <h2>{TITLE_SOLUTIONS}</h2>\n        <div class=\"stats-grid\">\n            <div class=\"stat-card\">\n                <p class=\"stat-number\">{len(solutions_to_show)}</p>\n                <p class=\"stat-label\">{LABEL_SOLUTIONS_ANALYSED}</p>\n            </div>\n            <div class=\"stat-card\">\n                <p class=\"stat-number\">{len(solution_images) if solution_images else 0}</p>\n                <p class=\"stat-label\">{LABEL_IMAGES_ASSOCIATED}</p>\n            </div>\n        </div>\n        <h3>Détails des solutions</h3>\n        {solutions_html}\n        <h3>Tableau récapitulatif</h3>\n        {table_html}\n        <p>\n            <strong>{LABEL_SELECTED_SOLUTION}</strong> {selected_solution if selected_solution else LABEL_NO_SELECTION}\n        </p>\n    </div>\n    """
 
 def _generate_comparative_section(df_comp=None, selected_categories=None, selected_companies=None):
     """Génère la section d'analyse comparative avec filtres appliqués."""
@@ -1315,25 +646,7 @@ def _generate_comparative_section(df_comp=None, selected_categories=None, select
     # Section par défaut si pas de données
     if df_comp is None or df_comp.empty:
         return f"""
-        <div class="section page-break" id="comparative">
-            <h2>4. Analyse comparative</h2>
-            
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <p class="stat-number">{len(filters_applied)}</p>
-                    <p class="stat-label">Filtres appliqués</p>
-                </div>
-                <div class="stat-card">
-                    <p class="stat-number">0</p>
-                    <p class="stat-label">Critères évalués</p>
-                </div>
-            </div>
-            
-            {filters_html}
-            
-            <p>Aucune donnée d'analyse comparative disponible avec les filtres actuels.</p>
-        </div>
-        """
+        <div class=\"section page-break\" id=\"comparative\">\n            <h2>{TITLE_COMPARATIVE}</h2>\n            <div class=\"stats-grid\">\n                <div class=\"stat-card\">\n                    <p class=\"stat-number\">{len(filters_applied)}</p>\n                    <p class=\"stat-label\">{LABEL_FILTERS}</p>\n                </div>\n                <div class=\"stat-card\">\n                    <p class=\"stat-number\">0</p>\n                    <p class=\"stat-label\">{LABEL_CRITERIA}</p>\n                </div>\n            </div>\n            {filters_html}\n            <p>{LABEL_NO_COMPARATIVE_DATA}</p>\n        </div>\n        """
     
     # Analyser les données disponibles
     total_criteria = len(df_comp)
@@ -1568,183 +881,13 @@ def _generate_recommendations():
 
 def _generate_methodology_section():
     """Génère la section méthodologie."""
-    return """
-    <div class="section page-break" id="methodologie">
-        <h2>6. Méthodologie</h2>
-        
-        <div class="highlight">
-            <h3>Approche méthodologique</h3>
-            <p>
-                L'analyse comparative a été menée selon une méthodologie structurée et objective, 
-                garantissant la fiabilité et la reproductibilité des résultats.
-            </p>
-        </div>
-        
-        <h3>Étapes de l'analyse</h3>
-        <div class="company-details">
-            <div class="detail-item">
-                <strong>1. Collecte des données</strong><br>
-                Recueil systématique des informations sur les entreprises et solutions évaluées
-            </div>
-            <div class="detail-item">
-                <strong>2. Définition des critères</strong><br>
-                Établissement d'une grille d'évaluation basée sur les besoins organisationnels
-            </div>
-            <div class="detail-item">
-                <strong>3. Évaluation comparative</strong><br>
-                Notation objective selon les critères définis avec vérification croisée
-            </div>
-            <div class="detail-item">
-                <strong>4. Analyse des résultats</strong><br>
-                Synthèse des évaluations et identification des patterns significatifs
-            </div>
-        </div>
-        
-        <h3>Critères d'évaluation</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Catégorie</th>
-                        <th>Description</th>
-                        <th>Pondération</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Fonctionnalités techniques</strong></td>
-                        <td>Évaluation des capacités techniques et fonctionnelles</td>
-                        <td>Élevée</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Facilité d'utilisation</strong></td>
-                        <td>Ergonomie et facilité d'adoption par les utilisateurs</td>
-                        <td>Moyenne</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Support et maintenance</strong></td>
-                        <td>Qualité du support technique et de la maintenance</td>
-                        <td>Élevée</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Coût total de possession</strong></td>
-                        <td>Analyse des coûts d'acquisition et d'exploitation</td>
-                        <td>Très élevée</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <h3>Limites et considérations</h3>
-        <p>
-            Cette analyse se base sur les informations disponibles au moment de l'évaluation. 
-            Les évolutions technologiques et les changements organisationnels peuvent influencer 
-            la pertinence des recommandations. Il est recommandé de procéder à des réévaluations 
-            périodiques pour maintenir la pertinence de l'analyse.
-        </p>
-    </div>
-    """
+    return f"""
+    <div class=\"section page-break\" id=\"methodologie\">\n        <h2>{TITLE_METHODOLOGY}</h2>\n        <div class=\"highlight\">\n            <h3>Approche méthodologique</h3>\n            <p>L'analyse comparative a été menée selon une méthodologie structurée et objective, garantissant la fiabilité et la reproductibilité des résultats.</p>\n        </div>\n        <h3>Étapes de l'analyse</h3>\n        <div class=\"company-details\">\n            <div class=\"detail-item\"><strong>1. Collecte des données</strong><br>Recueil systématique des informations sur les entreprises et solutions évaluées</div>\n            <div class=\"detail-item\"><strong>2. Définition des critères</strong><br>Établissement d'une grille d'évaluation basée sur les besoins organisationnels</div>\n            <div class=\"detail-item\"><strong>3. Évaluation comparative</strong><br>Notation objective selon les critères définis avec vérification croisée</div>\n            <div class=\"detail-item\"><strong>4. Analyse des résultats</strong><br>Synthèse des évaluations et identification des patterns significatifs</div>\n        </div>\n        <h3>Critères d'évaluation</h3>\n        <div class=\"table-container\">\n            <table>\n                <thead>\n                    <tr>\n                        <th>{LABEL_TABLE_SOLUTION[1]}</th>\n                        <th>Description</th>\n                        <th>Pondération</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    <tr>\n                        <td><strong>Fonctionnalités techniques</strong></td>\n                        <td>Évaluation des capacités techniques et fonctionnelles</td>\n                        <td>Élevée</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Facilité d'utilisation</strong></td>\n                        <td>Ergonomie et facilité d'adoption par les utilisateurs</td>\n                        <td>Moyenne</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Support et maintenance</strong></td>\n                        <td>Qualité du support technique et de la maintenance</td>\n                        <td>Élevée</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Coût total de possession</strong></td>\n                        <td>Analyse des coûts d'acquisition et d'exploitation</td>\n                        <td>Très élevée</td>\n                    </tr>\n                </tbody>\n            </table>\n        </div>\n        <h3>Limites et considérations</h3>\n        <p>Cette analyse se base sur les informations disponibles au moment de l'évaluation. Les évolutions technologiques et les changements organisationnels peuvent influencer la pertinence des recommandations. Il est recommandé de procéder à des réévaluations périodiques pour maintenir la pertinence de l'analyse.</p>\n    </div>\n    """
 
 def _generate_annexes():
     """Génère les annexes avec informations détaillées."""
-    return """
-    <div class="section page-break" id="annexes">
-        <h2>7. Annexes</h2>
-        
-        <h3>Méthodologie d'évaluation détaillée</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Aspect</th>
-                        <th>Description</th>
-                        <th>Méthode</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Critères d'évaluation</strong></td>
-                        <td>Évaluation binaire (0/1) ou numérique selon le critère</td>
-                        <td>Notation standardisée</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Pondération</strong></td>
-                        <td>Importance relative selon les besoins organisationnels</td>
-                        <td>Consultation des parties prenantes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Validation</strong></td>
-                        <td>Vérification croisée des évaluations</td>
-                        <td>Revue par les experts métier</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Mise à jour</strong></td>
-                        <td>Actualisation périodique des données</td>
-                        <td>Cycle de révision trimestriel</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <h3>Sources des données</h3>
-        <div class="company-details">
-            <div class="detail-item">
-                <strong>Documentation officielle</strong><br>
-                Fiches techniques et spécifications fournisseurs
-            </div>
-            <div class="detail-item">
-                <strong>Démonstrations techniques</strong><br>
-                Évaluations en conditions réelles d'utilisation
-            </div>
-            <div class="detail-item">
-                <strong>Retours d'expérience</strong><br>
-                Témoignages clients et études de cas
-            </div>
-            <div class="detail-item">
-                <strong>Analyses tierces</strong><br>
-                Rapports d'analystes et comparatifs sectoriels
-            </div>
-        </div>
-        
-        <h3>Glossaire</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Terme</th>
-                        <th>Définition</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Analyse comparative</strong></td>
-                        <td>Évaluation systématique de solutions selon des critères prédéfinis</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Critère différenciateur</strong></td>
-                        <td>Élément d'évaluation permettant de distinguer les solutions</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Pondération</strong></td>
-                        <td>Coefficient d'importance attribué à chaque critère d'évaluation</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Score normalisé</strong></td>
-                        <td>Notation standardisée permettant la comparaison entre solutions</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <h3>Informations techniques</h3>
-        <div class="highlight">
-            <p><strong>Plateforme d'analyse :</strong> IVÉO BI Platform</p>
-            <p><strong>Version du rapport :</strong> 1.0</p>
-            <p><strong>Format de données :</strong> Excel (.xlsx)</p>
-            <p><strong>Méthode d'export :</strong> HTML vers PDF</p>
-        </div>
-    </div>
-    """
+    return f"""
+    <div class=\"section page-break\" id=\"annexes\">\n        <h2>{TITLE_ANNEXES}</h2>\n        <h3>Méthodologie d'évaluation détaillée</h3>\n        <div class=\"table-container\">\n            <table>\n                <thead>\n                    <tr>\n                        <th>Aspect</th>\n                        <th>Description</th>\n                        <th>Méthode</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    <tr>\n                        <td><strong>Critères d'évaluation</strong></td>\n                        <td>Évaluation binaire ({LABEL_YES}/{LABEL_NO}) ou numérique selon le critère</td>\n                        <td>Notation standardisée</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Pondération</strong></td>\n                        <td>Importance relative selon les besoins organisationnels</td>\n                        <td>Consultation des parties prenantes</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Validation</strong></td>\n                        <td>Vérification croisée des évaluations</td>\n                        <td>Revue par les experts métier</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Mise à jour</strong></td>\n                        <td>Actualisation périodique des données</td>\n                        <td>Cycle de révision trimestriel</td>\n                    </tr>\n                </tbody>\n            </table>\n        </div>\n        <h3>Sources des données</h3>\n        <div class=\"company-details\">\n            <div class=\"detail-item\"><strong>Documentation officielle</strong><br>Fiches techniques et spécifications fournisseurs</div>\n            <div class=\"detail-item\"><strong>Démonstrations techniques</strong><br>Évaluations en conditions réelles d'utilisation</div>\n            <div class=\"detail-item\"><strong>Retours d'expérience</strong><br>Témoignages clients et études de cas</div>\n            <div class=\"detail-item\"><strong>Analyses tierces</strong><br>Rapports d'analystes et comparatifs sectoriels</div>\n        </div>\n        <h3>Glossaire</h3>\n        <div class=\"table-container\">\n            <table>\n                <thead>\n                    <tr>\n                        <th>Terme</th>\n                        <th>Définition</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    <tr>\n                        <td><strong>Analyse comparative</strong></td>\n                        <td>Évaluation systématique de solutions selon des critères prédéfinis</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Critère différenciateur</strong></td>\n                        <td>Élément d'évaluation permettant de distinguer les solutions</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Pondération</strong></td>\n                        <td>Coefficient d'importance attribué à chaque critère d'évaluation</td>\n                    </tr>\n                    <tr>\n                        <td><strong>Score normalisé</strong></td>\n                        <td>Notation standardisée permettant la comparaison entre solutions</td>\n                    </tr>\n                </tbody>\n            </table>\n        </div>\n        <h3>Informations techniques</h3>\n        <div class=\"highlight\">\n            <p><strong>Plateforme d'analyse :</strong> {META_GENERATOR}</p>\n            <p><strong>Version du rapport :</strong> 1.0</p>\n            <p><strong>Format de données :</strong> Excel (.xlsx)</p>\n            <p><strong>Méthode d'export :</strong> HTML vers PDF</p>\n        </div>\n    </div>\n    """
 
 def _generate_footer():
     """Génère le pied de page professionnel."""
@@ -1800,23 +943,20 @@ def generate_pdf_from_html(html_content):
         # Essayer avec WeasyPrint d'abord
         if WEASYPRINT_AVAILABLE:
             try:
-                # Test de disponibilité des bibliothèques avant utilisation
                 from weasyprint import HTML as WeasyHTML
                 pdf_bytes = WeasyHTML(string=html_content).write_pdf()
                 return pdf_bytes
             except Exception as e:
                 error_msg = str(e).lower()
                 if any(lib in error_msg for lib in ["libpango", "libcairo", "libffi", "shared object", "ctypes"]):
-                    st.warning("⚠️ Bibliothèques système manquantes pour WeasyPrint (libpango, libcairo). Tentative avec pdfkit...")
+                    st.warning(MSG_MISSING_LIBS)
                 elif "fontconfig" in error_msg:
-                    st.warning("⚠️ Configuration des polices manquante. Tentative avec pdfkit...")
+                    st.warning(MSG_MISSING_FONTCONFIG)
                 else:
-                    st.warning(f"⚠️ Erreur WeasyPrint: {error_msg}")
-        
+                    st.warning(MSG_WEASYPRINT_ERROR.format(error_msg))
         # Fallback avec pdfkit
         if PDFKIT_AVAILABLE:
             try:
-                import pdfkit as pdf_kit
                 MARGIN = '0.75in'
                 options = {
                     'page-size': 'A4',
@@ -1829,46 +969,25 @@ def generate_pdf_from_html(html_content):
                     'enable-local-file-access': None,
                     'quiet': ''
                 }
-                pdf_bytes = pdf_kit.from_string(html_content, False, options=options)
+                pdf_bytes = pdfkit.from_string(html_content, False, options=options)
                 return pdf_bytes
             except Exception as e:
                 error_msg = str(e)
                 if "wkhtmltopdf" in error_msg:
-                    st.warning("⚠️ wkhtmltopdf non installé sur cette plateforme.")
+                    st.warning(MSG_PDFKIT_MISSING)
                 elif "No such file or directory" in error_msg:
-                    st.warning("⚠️ Exécutable wkhtmltopdf introuvable.")
+                    st.warning(MSG_PDFKIT_NOT_FOUND)
                 else:
-                    st.warning(f"⚠️ Erreur pdfkit: {error_msg}")
-        
+                    st.warning(MSG_PDFKIT_ERROR.format(error_msg))
         # Si aucune bibliothèque n'est disponible ou si toutes ont échoué
-        st.info("""
-        💡 **Export PDF indisponible sur cette plateforme**
-        
-        **Solution de contournement :**
-        1. Utilisez l'export HTML
-        2. Ouvrez le fichier HTML dans votre navigateur
-        3. Utilisez Ctrl+P (ou Cmd+P sur Mac)
-        4. Sélectionnez "Enregistrer en PDF"
-        
-        Cette méthode produit d'excellents résultats PDF.
-        """)
+        st.info(MSG_PDF_EXPORT_UNAVAILABLE)
         return None
-        
     except Exception as e:
         error_msg = str(e).lower()
         if any(lib in error_msg for lib in ["libpango", "libcairo", "libffi", "shared object", "ctypes"]):
-            st.error("""
-            ❌ **Bibliothèques système manquantes**
-            
-            Cette plateforme ne dispose pas des bibliothèques nécessaires pour l'export PDF.
-            
-            **Solution recommandée :**
-            1. Cliquez sur "HTML" pour télécharger le rapport HTML
-            2. Ouvrez le fichier dans votre navigateur
-            3. Imprimez avec Ctrl+P → "Enregistrer en PDF"
-            """)
+            st.error(MSG_PDF_EXPORT_FATAL)
         else:
-            st.error(f"❌ Erreur lors de la génération PDF: {error_msg}")
+            st.error(MSG_PDF_EXPORT_ERROR.format(error_msg))
         return None
 
 def generate_report_pdf(df_ent, df_sol, df_comp, df_align=None):
@@ -1889,7 +1008,7 @@ def generate_report_pdf(df_ent, df_sol, df_comp, df_align=None):
         html_content = generate_html_report(df_ent, df_sol, df_comp, df_align)
         return html_content
     except Exception as e:
-        st.error(f"Erreur lors de la génération du rapport : {str(e)}")
+        st.error(MSG_REPORT_GEN_ERROR.format(str(e)))
         return None
 
 def create_download_link(content, filename):
@@ -1927,17 +1046,14 @@ def generate_report_with_export_options(df_ent, df_sol, df_comp, df_align=None):
     try:
         # Générer le contenu HTML
         html_content = generate_html_report(df_ent, df_sol, df_comp, df_align)
-        
         if not html_content:
             return {"html": None, "pdf": None}
-        
         # Générer le PDF à partir du HTML
         pdf_content = generate_pdf_from_html(html_content)
-        
         return {
             "html": html_content,
             "pdf": pdf_content
         }
     except Exception as e:
-        st.error(f"Erreur lors de la génération du rapport : {str(e)}")
+        st.error(MSG_REPORT_GEN_ERROR.format(str(e)))
         return {"html": None, "pdf": None}

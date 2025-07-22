@@ -1,7 +1,81 @@
+"""
+Sidebar IVÉO BI — Variables globales pour labels, titres, messages, styles
+"""
 # sidebar.py
+
 import streamlit as st
 import random, json
 from streamlit_cookies_manager import EncryptedCookieManager
+
+# =================== VARIABLES GLOBALES (labels, titres, messages, styles, états) ===================
+SIDEBAR_SECTION_EXPORT = "Export de rapport"
+SIDEBAR_SECTION_EXPORT_ICON = "📄"
+SIDEBAR_EXPORT_INFO = "Générez un rapport complet incluant toutes les analyses avec les filtres appliqués"
+SIDEBAR_EXPORT_HTML_BTN = "📄 HTML"
+SIDEBAR_EXPORT_HTML_HELP = "Génère et télécharge le rapport HTML"
+SIDEBAR_EXPORT_PDF_BTN = "📄 PDF"
+SIDEBAR_EXPORT_PDF_HELP = "Génère et télécharge le rapport PDF (peut échouer sur certaines plateformes)"
+SIDEBAR_EXPORT_HTML_SUCCESS = "Rapport HTML généré!"
+SIDEBAR_EXPORT_HTML_ERROR = "Erreur lors de la génération HTML"
+SIDEBAR_EXPORT_PDF_SUCCESS = "Rapport PDF généré!"
+SIDEBAR_EXPORT_PDF_ERROR = "Erreur PDF: {error}"
+SIDEBAR_EXPORT_PDF_WARNING = "Erreur PDF: {error}"
+SIDEBAR_EXPORT_PDF_INFO = "Utilisez l'export HTML puis convertissez avec votre navigateur (Ctrl+P → Enregistrer en PDF)"
+SIDEBAR_EXPORT_PDF_UNAVAILABLE = "Export PDF indisponible. Utilisez HTML puis convertissez avec votre navigateur."
+SIDEBAR_EXPORT_MODULE_ERROR = "Module de rapport non disponible: {error}"
+SIDEBAR_EXPORT_MODULE_INFO = "Le module de génération de rapport n'est pas accessible"
+SIDEBAR_EXPORT_BTN_INFO = "ℹ️ À propos du rapport"
+SIDEBAR_EXPORT_BTN_HELP = "Informations sur le rapport PDF"
+SIDEBAR_EXPORT_BTN_HELP2 = "Informations détaillées sur le contenu du rapport HTML"
+SIDEBAR_EXPORT_MODULE_UNAVAILABLE = (
+    "La fonctionnalité d'export PDF est temporairement indisponible.<br>"
+    "Veuillez contacter l'administrateur pour résoudre ce problème."
+)
+SIDEBAR_EXPORT_HTML_CONTENT = (
+    "<strong>Le rapport HTML inclut:</strong><br><br>"
+    "<strong>1. Résumé exécutif</strong><br>"
+    "- Statistiques générales<br>"
+    "- Contexte de l'analyse<br><br>"
+    "<strong>2. Analyse des entreprises</strong><br>"
+    "- Entreprises sélectionnées<br>"
+    "- Informations détaillées<br><br>"
+    "<strong>3. Analyse des solutions</strong><br>"
+    "- Solutions évaluées<br>"
+    "- Caractéristiques techniques<br><br>"
+    "<strong>4. Analyse comparative</strong><br>"
+    "- Critères d'évaluation<br>"
+    "- Filtres appliqués<br><br>"
+    "<strong>5. Recommandations</strong><br>"
+    "- Conseils stratégiques<br>"
+    "- Prochaines étapes<br><br>"
+    "<strong>6. Annexes</strong><br>"
+    "- Méthodologie<br>"
+    "- Glossaire<br><br>"
+    "<strong>💡 Astuce:</strong> Pour convertir en PDF, ouvrez le fichier HTML dans votre navigateur et utilisez Ctrl+P → 'Enregistrer en PDF'"
+)
+# Variables globales pour la section comparatif
+SIDEBAR_SECTION_FILTER = "Filtrer les entreprises"
+SIDEBAR_SECTION_FILTER_ICON = "🏢"
+SIDEBAR_FILTER_HELP = "Sélectionnez les entreprises à comparer sur le graphique"
+SIDEBAR_FILTER_EXPANDER = "Sélection"
+SIDEBAR_FILTER_CHECKBOX = "Tout sélectionner"
+SIDEBAR_FILTER_MULTI = "Entreprises à comparer"
+SIDEBAR_FILTER_MULTI_HELP = "Choisissez jusqu'à {max} entreprises pour une comparaison optimale"
+SIDEBAR_FILTER_WARNING = "Au-delà de {max} entreprises, le radar devient moins lisible."
+SIDEBAR_SECTION_COLOR = "Couleurs personnalisées"
+SIDEBAR_COLOR_HELP = "Personnalisez la couleur de chaque entreprise"
+# Variables globales pour la section alignement
+SIDEBAR_SECTION_ALIGN = "Type d'exigence"
+SIDEBAR_ALIGN_INFO = "{n} types d'exigences disponibles"
+SIDEBAR_ALIGN_RADIO_LABEL = "Choisissez un type d'exigence"
+SIDEBAR_ALIGN_RADIO_HELP = "Sélectionnez le type d'exigence pour l'analyse d'alignement"
+SIDEBAR_ALIGN_RADIO_CONTAINER_STYLE = (
+    "background: rgba(248, 249, 250, 0.9);"
+    "border: 1px solid rgba(0, 114, 178, 0.2);"
+    "border-radius: 12px;"
+    "padding: 16px;"
+    "margin: 12px 0;"
+)
 
 # —————————————————————————————————————————————
 # 1) Initialisation du gestionnaire de cookies
@@ -399,10 +473,9 @@ def show_sidebar_comparatif(
         previous = entreprises_disponibles[:3]
 
     # Section de filtrage avec style moderne et icône élégante
-    create_sidebar_section("Filtrer les entreprises", "🏢")
-    
+    create_sidebar_section(SIDEBAR_SECTION_FILTER, SIDEBAR_SECTION_FILTER_ICON)
     # Ajout d'un petit texte d'aide stylé
-    st.sidebar.markdown("""
+    st.sidebar.markdown(f"""
     <div style="
         background: rgba(248, 249, 250, 0.9);
         border: 1px solid rgba(0, 114, 178, 0.2);
@@ -413,35 +486,31 @@ def show_sidebar_comparatif(
         font-size: 0.9rem;
         font-weight: 500;
     ">
-        Sélectionnez les entreprises à comparer sur le graphique
+        {SIDEBAR_FILTER_HELP}
     </div>
     """, unsafe_allow_html=True)
-    
-    with st.sidebar.expander("Sélection", expanded=True):
+    with st.sidebar.expander(SIDEBAR_FILTER_EXPANDER, expanded=True):
         all_sel = st.checkbox(
-            "Tout sélectionner",
+            SIDEBAR_FILTER_CHECKBOX,
             value=(len(previous) == len(entreprises_disponibles)),
         )
         if all_sel:
             sel = entreprises_disponibles
         else:
             sel = st.multiselect(
-                "Entreprises à comparer",
+                SIDEBAR_FILTER_MULTI,
                 entreprises_disponibles,
                 default=previous,
-                help="Choisissez jusqu'à 6 entreprises pour une comparaison optimale"
+                help=SIDEBAR_FILTER_MULTI_HELP.format(max=max_comparaison)
             )
         if len(sel) > max_comparaison:
-            st.warning(f"Au-delà de {max_comparaison} entreprises, le radar devient moins lisible.")
-
+            st.warning(SIDEBAR_FILTER_WARNING.format(max=max_comparaison))
     # on sérialise la sélection
     cookies[KEY_SEL] = json.dumps(sel)
-
     # Section couleurs avec style moderne et icône élégante
-    create_sidebar_section("Couleurs personnalisées", "")
-    
+    create_sidebar_section(SIDEBAR_SECTION_COLOR, "")
     # Ajout d'un petit texte d'aide stylé
-    st.sidebar.markdown("""
+    st.sidebar.markdown(f"""
     <div style="
         background: rgba(248, 249, 250, 0.9);
         border: 1px solid rgba(0, 114, 178, 0.2);
@@ -452,7 +521,7 @@ def show_sidebar_comparatif(
         font-size: 0.9rem;
         font-weight: 500;
     ">
-        Personnalisez la couleur de chaque entreprise
+        {SIDEBAR_COLOR_HELP}
     </div>
     """, unsafe_allow_html=True)
     
@@ -517,12 +586,12 @@ def show_sidebar(
     label: str,
     options: list[str],
     default: list[str]|None = None,
-    multiselect: bool = True
+    multiselect: bool = True,
+    key: str|None = None
 ) -> list[str]:
     # Appliquer les styles modernes
     apply_sidebar_styles()
-    
-    KEY = f"{label.replace(' ', '_').lower()}_selected"
+    KEY = key if key is not None else f"{label.replace(' ', '_').lower()}_selected"
     raw = cookies.get(KEY)
     previous = json.loads(raw) if raw else (default or options[:1])
     previous = [v for v in previous if v in options]
@@ -603,8 +672,7 @@ def show_sidebar_alignement(df_align) -> str:
         prev = types_[0] if types_ else ""
 
     # Section stylée avec icône spécialisée
-    create_sidebar_section("Type d'exigence", "")
-    
+    create_sidebar_section(SIDEBAR_SECTION_ALIGN, "")
     # Ajout d'informations contextuelles
     st.sidebar.markdown(f"""
     <div style="
@@ -617,31 +685,21 @@ def show_sidebar_alignement(df_align) -> str:
         font-size: 0.9rem;
         font-weight: 500;
     ">
-        {len(types_)} types d'exigences disponibles
+        {SIDEBAR_ALIGN_INFO.format(n=len(types_))}
     </div>
     """, unsafe_allow_html=True)
-    
     # Conteneur stylé pour les radio buttons
-    st.sidebar.markdown("""
-    <div style="
-        background: rgba(248, 249, 250, 0.9);
-        border: 1px solid rgba(0, 114, 178, 0.2);
-        border-radius: 12px;
-        padding: 16px;
-        margin: 12px 0;
-    ">
+    st.sidebar.markdown(f"""
+    <div style="{SIDEBAR_ALIGN_RADIO_CONTAINER_STYLE}">
     """, unsafe_allow_html=True)
-    
     sel = st.sidebar.radio(
-        "Choisissez un type d'exigence",
+        SIDEBAR_ALIGN_RADIO_LABEL,
         options=types_,
         index=types_.index(prev) if prev in types_ else 0,
         key=KEY,
-        help="Sélectionnez le type d'exigence pour l'analyse d'alignement"
+        help=SIDEBAR_ALIGN_RADIO_HELP
     )
-    
     st.sidebar.markdown("</div>", unsafe_allow_html=True)
-
     cookies[KEY] = sel if sel is not None else ""
     return sel if sel is not None else ""
 
@@ -657,14 +715,12 @@ def add_pdf_download_section(df_ent=None, df_sol=None, df_comp=None, df_align=No
     """
     # Section stylée pour le téléchargement PDF - toujours affichée
     st.sidebar.markdown("---")
-    create_sidebar_section("Export de rapport", "📄")
-    
+    create_sidebar_section(SIDEBAR_SECTION_EXPORT, SIDEBAR_SECTION_EXPORT_ICON)
     try:
         from app.pdf_generator_html import generate_report_with_export_options, create_download_link
         from datetime import datetime
-        
         # Informations sur le rapport - toujours affichées
-        st.sidebar.markdown("""
+        st.sidebar.markdown(f"""
         <div style="
             background: rgba(248, 249, 250, 0.9);
             border: 1px solid rgba(0, 114, 178, 0.2);
@@ -675,67 +731,60 @@ def add_pdf_download_section(df_ent=None, df_sol=None, df_comp=None, df_align=No
             font-size: 0.9rem;
             font-weight: 500;
         ">
-            Générez un rapport complet incluant toutes les analyses avec les filtres appliqués
+            {SIDEBAR_EXPORT_INFO}
         </div>
         """, unsafe_allow_html=True)
-        
         # Boutons d'export - toujours les deux options disponibles
         col1, col2 = st.sidebar.columns(2)
-        
         with col1:
             if st.button(
-                "📄 HTML",
+                SIDEBAR_EXPORT_HTML_BTN,
                 key="generate_html_button",
-                help="Génère et télécharge le rapport HTML"
+                help=SIDEBAR_EXPORT_HTML_HELP
             ):
                 with st.spinner("Génération du rapport HTML..."):
                     try:
                         reports = generate_report_with_export_options(df_ent, df_sol, df_comp, df_align)
-                        
                         if reports["html"]:
                             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                             filename = f"rapport_iveo_{timestamp}.html"
                             download_link = create_download_link(reports["html"], filename)
-                            st.success("✅ Rapport HTML généré!")
+                            st.success(SIDEBAR_EXPORT_HTML_SUCCESS)
                             st.markdown(download_link, unsafe_allow_html=True)
                         else:
-                            st.error("❌ Erreur lors de la génération HTML")
+                            st.error(SIDEBAR_EXPORT_HTML_ERROR)
                     except Exception as e:
-                        st.error(f"❌ Erreur HTML: {str(e)}")
-        
+                        st.error(f"Erreur HTML: {str(e)}")
         with col2:
             if st.button(
-                "📄 PDF",
+                SIDEBAR_EXPORT_PDF_BTN,
                 key="generate_pdf_button",
-                help="Génère et télécharge le rapport PDF (peut échouer sur certaines plateformes)"
+                help=SIDEBAR_EXPORT_PDF_HELP
             ):
                 with st.spinner("Génération du rapport PDF..."):
                     try:
                         reports = generate_report_with_export_options(df_ent, df_sol, df_comp, df_align)
-                        
                         if reports["pdf"]:
                             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                             filename = f"rapport_iveo_{timestamp}.pdf"
                             download_link = create_download_link(reports["pdf"], filename)
-                            st.success("✅ Rapport PDF généré!")
+                            st.success(SIDEBAR_EXPORT_PDF_SUCCESS)
                             st.markdown(download_link, unsafe_allow_html=True)
                         else:
-                            st.info("💡 Export PDF indisponible. Utilisez HTML puis convertissez avec votre navigateur.")
+                            st.info(SIDEBAR_EXPORT_PDF_UNAVAILABLE)
                     except Exception as e:
-                        st.warning(f"⚠️ Erreur PDF: {str(e)}")
-                        st.info("💡 Utilisez l'export HTML puis convertissez avec votre navigateur (Ctrl+P → Enregistrer en PDF)")
-    
+                        st.warning(SIDEBAR_EXPORT_PDF_WARNING.format(error=str(e)))
+                        st.info(SIDEBAR_EXPORT_PDF_INFO)
     except ImportError as e:
-        st.sidebar.error(f"❌ Module de rapport non disponible: {str(e)}")
-        st.sidebar.info("Le module de génération de rapport n'est pas accessible")
-        
+        st.sidebar.error(SIDEBAR_EXPORT_MODULE_ERROR.format(error=str(e)))
+        st.sidebar.info(SIDEBAR_EXPORT_MODULE_INFO)
         # Afficher quand même les boutons d'information
         if st.sidebar.button(
-            "ℹ️ À propos du rapport",
+            SIDEBAR_EXPORT_BTN_INFO,
             key="pdf_info_button_fallback",
-            help="Informations sur le rapport PDF"
+            help=SIDEBAR_EXPORT_BTN_HELP
         ):
-            st.sidebar.markdown("""
+            st.sidebar.markdown(f"""
             <div style="
                 background: rgba(248, 249, 250, 0.9);
                 border: 1px solid rgba(0, 114, 178, 0.2);
@@ -746,21 +795,18 @@ def add_pdf_download_section(df_ent=None, df_sol=None, df_comp=None, df_align=No
                 font-size: 0.85rem;
                 line-height: 1.4;
             ">
-                La fonctionnalité d'export PDF est temporairement indisponible.<br>
-                Veuillez contacter l'administrateur pour résoudre ce problème.
+                {SIDEBAR_EXPORT_MODULE_UNAVAILABLE}
             </div>
             """, unsafe_allow_html=True)
-    
     except Exception as e:
-        st.sidebar.error(f"❌ Erreur: {str(e)}")
-        
+        st.sidebar.error(f"Erreur: {str(e)}")
     # Bouton d'information - toujours affiché
     if st.sidebar.button(
-        "ℹ️ À propos du rapport",
+        SIDEBAR_EXPORT_BTN_INFO,
         key="pdf_info_button",
-        help="Informations détaillées sur le contenu du rapport HTML"
+        help=SIDEBAR_EXPORT_BTN_HELP2
     ):
-        st.sidebar.markdown("""
+        st.sidebar.markdown(f"""
         <div style="
             background: rgba(248, 249, 250, 0.9);
             border: 1px solid rgba(0, 114, 178, 0.2);
@@ -771,32 +817,6 @@ def add_pdf_download_section(df_ent=None, df_sol=None, df_comp=None, df_align=No
             font-size: 0.85rem;
             line-height: 1.4;
         ">
-            <strong>Le rapport HTML inclut:</strong><br><br>
-            
-            <strong>1. Résumé exécutif</strong><br>
-            - Statistiques générales<br>
-            - Contexte de l'analyse<br><br>
-            
-            <strong>2. Analyse des entreprises</strong><br>
-            - Entreprises sélectionnées<br>
-            - Informations détaillées<br><br>
-            
-            <strong>3. Analyse des solutions</strong><br>
-            - Solutions évaluées<br>
-            - Caractéristiques techniques<br><br>
-            
-            <strong>4. Analyse comparative</strong><br>
-            - Critères d'évaluation<br>
-            - Filtres appliqués<br><br>
-            
-            <strong>5. Recommandations</strong><br>
-            - Conseils stratégiques<br>
-            - Prochaines étapes<br><br>
-            
-            <strong>6. Annexes</strong><br>
-            - Méthodologie<br>
-            - Glossaire<br><br>
-            
-            <strong>💡 Astuce:</strong> Pour convertir en PDF, ouvrez le fichier HTML dans votre navigateur et utilisez Ctrl+P → "Enregistrer en PDF"
+            {SIDEBAR_EXPORT_HTML_CONTENT}
         </div>
         """, unsafe_allow_html=True)

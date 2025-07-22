@@ -1,12 +1,30 @@
+
+# =================== VARIABLES GLOBALES (labels, titres, messages, navigation) ===================
+PAGE_TITLE = "Tableau de bord IVÉO"
+PAGE_ICON = "https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg"
+NAV_PAGES = ("Accueil", "Entreprise", "Solution", "Analyse comparative", "Assistant IA")
+ERROR_NO_FILE = "Fichier non trouvé. Déposez-le, corrigez le chemin ou utilisez une URL valide."
+UPLOAD_LABEL = "Ou déposez un fichier Excel (.xlsx)"
+UPLOAD_TYPE = "xlsx"
+UPLOAD_KEY = "uploader"
+PATH_INPUT_LABEL = "Chemin local ou URL du fichier Excel"
+PATH_INPUT_KEY = "excel_path_input"
+SIDEBAR_LOGO = "https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg"
+SIDEBAR_NAV_LABEL = "Navigation"
+SIDEBAR_NAV_KEY = "page_selector"
+ERROR_HOME = "Aucune donnée à afficher sur la page d'accueil."
+ERROR_ENT = "Aucune donnée entreprise à afficher."
+ERROR_SOL = "Aucune donnée solution à afficher."
+ERROR_COMP = "Aucune donnée d'analyse comparative à afficher."
+
 import streamlit as st
 import os
-
 # -----------------------------------------------------------------------------
 # 1) Configuration de la page — Doit être **le tout premier** appel Streamlit
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Tableau de bord IVÉO",
-    page_icon="https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg",
+    page_title=PAGE_TITLE,
+    page_icon=PAGE_ICON,
     layout="wide",
     menu_items={
         "Get Help": None,
@@ -21,7 +39,7 @@ st.set_page_config(
 import io
 from app import utils
 from app.pages import analyse_comparative, home, entreprise, solution, chatbot
-import sidebar  # votre sidebar.py à la racine
+import sidebar
 
 # -----------------------------------------------------------------------------
 # 3) Masquer “View source on GitHub”
@@ -103,74 +121,68 @@ st.markdown(
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.image(
-        "https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg",
+        SIDEBAR_LOGO,
         use_container_width=True,
     )
     st.markdown("---")
 
     # 1) lire le dernier chemin ou URL depuis le cookie
     default_path = sidebar.cookies.get("excel_path") or ""
-
     # 2) uploader drag & drop
     upload = st.file_uploader(
-        "Ou déposez un fichier Excel (.xlsx)",
-        type="xlsx",
-        key="uploader",
+        UPLOAD_LABEL,
+        type=UPLOAD_TYPE,
+        key=UPLOAD_KEY,
     )
-    path_input = default_path
+    uploaded_file = None
+    # 1) Si un fichier est uploadé, priorité à ce fichier
     if upload:
         os.makedirs("uploads", exist_ok=True)
         saved_path = os.path.abspath(os.path.join("uploads", upload.name))
         with open(saved_path, "wb") as f:
             f.write(upload.getvalue())
-        path_input = saved_path
+        uploaded_file = upload
+        uploaded_file.name = upload.name
         sidebar.cookies["excel_path"] = saved_path
-
-    # 3) champ texte pour chemin local ou URL, pré-rempli
-    path_input = st.text_input(
-        "Chemin local ou URL du fichier Excel",
-        value=path_input,
-        key="excel_path_input",
-    )
-
-    # 4) déterminer la source effective
-    uploaded_file = None
-    if path_input.startswith(("http://", "https://")):
-        import requests
-        from io import BytesIO
-
-        url = path_input
-        if "sharepoint.com" in url and "download=" not in url:
-            base = url.split("?")[0]
-            url = f"{base}?download=1"
-
-        resp = requests.get(url)
-        try:
-            resp.raise_for_status()
-        except Exception as e:
-            st.error(f"Échec du téléchargement ({resp.status_code}) : {e}")
-            st.stop()
-        uploaded_file = BytesIO(resp.content)
-        uploaded_file.name = os.path.basename(path_input.split("?")[0])
-        sidebar.cookies["excel_path"] = path_input
-
-    elif os.path.isfile(path_input):
-        with open(path_input, "rb") as f:
-            data = f.read()
-        from io import BytesIO
-        uploaded_file = BytesIO(data)
-        uploaded_file.name = os.path.basename(path_input)
-        sidebar.cookies["excel_path"] = path_input
-
+    else:
+        # 2) Sinon, utiliser le champ texte pour chemin local ou URL
+        path_input = st.text_input(
+            PATH_INPUT_LABEL,
+            value=default_path,
+            key=PATH_INPUT_KEY,
+        )
+        if path_input.startswith(("http://", "https://")):
+            import requests
+            from io import BytesIO
+            url = path_input
+            if "sharepoint.com" in url and "download=" not in url:
+                base = url.split("?")[0]
+                url = f"{base}?download=1"
+            resp = requests.get(url)
+            try:
+                resp.raise_for_status()
+            except Exception as e:
+                st.error(f"Échec du téléchargement ({resp.status_code}) : {e}")
+                st.stop()
+            uploaded_file = BytesIO(resp.content)
+            uploaded_file.name = os.path.basename(path_input.split("?")[0])
+            sidebar.cookies["excel_path"] = path_input
+        elif os.path.isfile(path_input):
+            with open(path_input, "rb") as f:
+                data = f.read()
+            from io import BytesIO
+            uploaded_file = BytesIO(data)
+            uploaded_file.name = os.path.basename(path_input)
+            sidebar.cookies["excel_path"] = path_input
     if not uploaded_file:
-        st.error("Fichier non trouvé. Déposez-le, corrigez le chemin ou utilisez une URL valide.")
+        st.error(ERROR_NO_FILE)
         st.stop()
 
     st.markdown("---")
     page = st.radio(
-        "Navigation",
-        ("Entreprise", "Solution", "Analyse comparative", "Assistant IA"),
-        key="page_selector",
+        SIDEBAR_NAV_LABEL,
+        NAV_PAGES,
+        key=SIDEBAR_NAV_KEY,
     )
 # -----------------------------------------------------------------------------
 # 6) Chargement + cache des données
@@ -187,30 +199,32 @@ df_comp, df_ent, df_align, df_sol = load_from_bytes(
 # -----------------------------------------------------------------------------
 # 7) Dispatch selon la page
 # -----------------------------------------------------------------------------
-if page == "Entreprise":
-    # On vérifie que le DataFrame est bien chargé et non vide
+if page == NAV_PAGES[0]:  # Accueil
+    if df_comp is not None and not df_comp.empty:
+        all_dfs = {"Comparatif": df_comp, "Entreprise": df_ent, "Solution": df_sol}
+        home.display(all_dfs)
+    else:
+        st.error(ERROR_HOME)
+elif page == NAV_PAGES[1]:  # Entreprise
     if df_ent is not None and not df_ent.empty:
         entreprise.display(df_ent)
     else:
-        st.error("Aucune donnée entreprise à afficher.")
-elif page == "Solution":
-    # On vérifie que le DataFrame est bien chargé et non vide
+        st.error(ERROR_ENT)
+elif page == NAV_PAGES[2]:  # Solution
     if df_sol is not None and not df_sol.empty:
         solution.display(df_sol)
     else:
-        st.error("Aucune donnée solution à afficher.")
-elif page == "Analyse comparative":
+        st.error(ERROR_SOL)
+elif page == NAV_PAGES[3]:  # Analyse comparative
     if df_comp is not None and not df_comp.empty:
-        # Créer un dictionnaire avec les DataFrames comme attendu par la nouvelle page
         all_dfs = {"Analyse comparative": df_comp}
         analyse_comparative.display(all_dfs)
     else:
-        st.error("Aucune donnée d'analyse comparative à afficher.")
-elif page == "Assistant IA":
-    # Créer un dictionnaire avec tous les DataFrames pour le chatbot
+        st.error(ERROR_COMP)
+elif page == NAV_PAGES[4]:  # Assistant IA
     all_dfs = {
         "Analyse comparative": df_comp,
-        "Entreprises": df_ent,
+        "Entreprise": df_ent,
         "Solutions": df_sol,
         "Alignement": df_align
     }

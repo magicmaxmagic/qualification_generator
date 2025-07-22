@@ -28,8 +28,87 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib import colors
+
+# =================== VARIABLES GLOBALES (labels, titres, messages, colonnes, limites) ===================
+TITLE_HEADER = "IVÉO - Intelligence d'Affaires"
+TITLE_REPORT = "Rapport d'Analyse Comparative"
+LABEL_GENERATED_ON = "Généré le {date}"
+TITLE_TOC = "Table des matières"
+TOC_ITEMS = [
+    "1. Résumé exécutif",
+    "2. Analyse des entreprises",
+    "3. Analyse des solutions",
+    "4. Analyse comparative",
+    "5. Recommandations",
+    "6. Annexes"
+]
+TITLE_EXEC_SUMMARY = "1. Résumé exécutif"
+LABEL_NB_COMPANIES = "Nombre d'entreprises analysées"
+LABEL_NB_SOLUTIONS = "Nombre de solutions évaluées"
+LABEL_NB_CRITERIA = "Critères d'évaluation"
+CONTEXT_TEXT = (
+    "Ce rapport présente une analyse comparative complète des solutions et entreprises "
+    "évaluées selon les critères définis. L'analyse inclut des évaluations détaillées, "
+    "des comparaisons objectives et des recommandations stratégiques pour faciliter "
+    "la prise de décision."
+)
+TITLE_COMPANIES = "2. Analyse des entreprises"
+LABEL_NO_COMPANY_DATA = "Aucune donnée d'entreprise disponible."
+TABLE_COMPANY_HEADER = ["Entreprise", "Secteur", "Localisation", "Statut"]
+COMPANY_COL_SECTOR = "Secteur d'activité"
+COMPANY_COL_LOCATION = "Localisation"
+COMPANY_COL_STATUS = "Statut"
+COMPANY_MAX = 10
+TITLE_SOLUTIONS = "3. Analyse des solutions"
+LABEL_NO_SOLUTION_DATA = "Aucune donnée de solution disponible."
+TABLE_SOLUTION_HEADER = ["Solution", "Catégorie", "Fournisseur", "Statut"]
+SOLUTION_COL_CATEGORY = "Catégorie"
+SOLUTION_COL_PROVIDER = "Fournisseur"
+SOLUTION_COL_STATUS = "Statut"
+SOLUTION_MAX = 5
+TITLE_COMPARATIVE = "4. Analyse comparative"
+LABEL_NO_COMP_DATA = "Aucune donnée d'analyse comparative disponible."
+LABEL_FILTERS_APPLIED = "Filtres appliqués:"
+LABEL_CATEGORIES = "Catégories: {categories}"
+LABEL_COMPANIES = "Entreprises: {companies}"
+TABLE_COMPARISON_HEADER = ["Type d'exigence", "Domaine", "Exigence différenciateur", "Exigence"]
+COMPARISON_COL_TYPE = "Type d'exigence"
+COMPARISON_COL_DOMAIN = "Domaine"
+COMPARISON_COL_DIFF = "Exigence différenciateur"
+COMPARISON_COL_REQ = "Exigence"
+COMPARISON_MAX = 15
+TITLE_RECOMMENDATIONS = "5. Recommandations"
+RECOMMENDATIONS_TEXT = (
+    "Basé sur l'analyse comparative réalisée, voici les principales recommandations :\n\n"
+    "• Prioriser les solutions qui répondent aux exigences critiques identifiées\n"
+    "• Considérer les aspects de compatibilité et d'intégration avec l'infrastructure existante\n"
+    "• Évaluer le rapport coût-bénéfice pour chaque solution candidate\n"
+    "• Planifier une phase pilote pour valider les solutions présélectionnées\n"
+    "• Prévoir une stratégie de formation et d'accompagnement au changement\n\n"
+    "Ces recommandations doivent être adaptées selon le contexte spécifique de l'organisation\n"
+    "et les contraintes opérationnelles identifiées."
+)
+TITLE_ANNEXES = "6. Annexes"
+ANNEXES_TEXT = (
+    "Méthodologie d'évaluation:\n"
+    "- Critères d'évaluation binaires (0/1)\n"
+    "- Pondération selon les exigences métier\n"
+    "- Validation par les parties prenantes\n\n"
+    "Sources des données:\n"
+    "- Fichier Excel d'analyse comparative\n"
+    "- Données fournisseurs\n"
+    "- Évaluations internes\n\n"
+    "Glossaire des termes techniques disponible sur demande."
+)
+DOWNLOAD_LABEL = "📄 Télécharger le rapport PDF"
+DOWNLOAD_STYLE = (
+    "display: inline-block; color: #fff; background-color: #0072B2; text-decoration: none; "
+    "font-weight: bold; padding: 12px 24px; border-radius: 8px; margin: 10px 0;"
+)
+ERROR_PDF_GEN = "Erreur lors de la génération du PDF : {error}"
 
 
 # Couleurs IVÉO
@@ -106,50 +185,31 @@ class IVEOPDFGenerator:
     
     def _add_header(self):
         """Ajoute l'en-tête du rapport avec le logo IVÉO."""
-        # Utiliser un header textuel simple pour éviter les problèmes d'images
-        self.story.append(Paragraph("IVÉO - Intelligence d'Affaires", self.styles['IVEOTitle']))
+        self.story.append(Paragraph(TITLE_HEADER, self.styles['IVEOTitle']))
         self.story.append(Spacer(1, 10))
-        
-        # Titre du rapport
-        self.story.append(Paragraph("Rapport d'Analyse Comparative", self.styles['IVEOTitle']))
-        
-        # Date de génération
+        self.story.append(Paragraph(TITLE_REPORT, self.styles['IVEOTitle']))
         date_str = datetime.now().strftime("%d/%m/%Y à %H:%M")
-        self.story.append(Paragraph(f"Généré le {date_str}", self.styles['IVEOCaption']))
-        
+        self.story.append(Paragraph(LABEL_GENERATED_ON.format(date=date_str), self.styles['IVEOCaption']))
         self.story.append(Spacer(1, 20))
     
     def _add_table_of_contents(self):
         """Ajoute une table des matières."""
-        self.story.append(Paragraph("Table des matières", self.styles['IVEOSubtitle']))
-        
-        toc_items = [
-            "1. Résumé exécutif",
-            "2. Analyse des entreprises",
-            "3. Analyse des solutions",
-            "4. Analyse comparative",
-            "5. Recommandations",
-            "6. Annexes"
-        ]
-        
-        for item in toc_items:
+        self.story.append(Paragraph(TITLE_TOC, self.styles['IVEOSubtitle']))
+        for item in TOC_ITEMS:
             self.story.append(Paragraph(item, self.styles['IVEONormal']))
-        
         self.story.append(PageBreak())
     
     def _add_executive_summary(self, df_ent, df_sol, df_comp):
         """Ajoute le résumé exécutif."""
-        self.story.append(Paragraph("1. Résumé exécutif", self.styles['IVEOSubtitle']))
-        
+        self.story.append(Paragraph(TITLE_EXEC_SUMMARY, self.styles['IVEOSubtitle']))
         # Statistiques générales
         stats_data = []
         if df_ent is not None and not df_ent.empty:
-            stats_data.append(["Nombre d'entreprises analysées", str(len(df_ent))])
+            stats_data.append([LABEL_NB_COMPANIES, str(len(df_ent))])
         if df_sol is not None and not df_sol.empty:
-            stats_data.append(["Nombre de solutions évaluées", str(len(df_sol))])
+            stats_data.append([LABEL_NB_SOLUTIONS, str(len(df_sol))])
         if df_comp is not None and not df_comp.empty:
-            stats_data.append(["Critères d'évaluation", str(len(df_comp))])
-        
+            stats_data.append([LABEL_NB_CRITERIA, str(len(df_comp))])
         if stats_data:
             stats_table = Table(stats_data, colWidths=[3*inch, 2*inch])
             stats_table.setStyle(TableStyle([
@@ -163,36 +223,20 @@ class IVEOPDFGenerator:
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
             self.story.append(stats_table)
-        
         self.story.append(Spacer(1, 20))
-        
-        # Contexte du rapport
-        context_text = """
-        Ce rapport présente une analyse comparative complète des solutions et entreprises 
-        évaluées selon les critères définis. L'analyse inclut des évaluations détaillées, 
-        des comparaisons objectives et des recommandations stratégiques pour faciliter 
-        la prise de décision.
-        """
-        self.story.append(Paragraph(context_text, self.styles['IVEONormal']))
-        
+        self.story.append(Paragraph(CONTEXT_TEXT, self.styles['IVEONormal']))
         self.story.append(PageBreak())
     
     def _add_companies_analysis(self, df_ent):
         """Ajoute l'analyse des entreprises."""
-        self.story.append(Paragraph("2. Analyse des entreprises", self.styles['IVEOSubtitle']))
-        
+        self.story.append(Paragraph(TITLE_COMPANIES, self.styles['IVEOSubtitle']))
         if df_ent is None or df_ent.empty:
-            self.story.append(Paragraph("Aucune donnée d'entreprise disponible.", self.styles['IVEONormal']))
+            self.story.append(Paragraph(LABEL_NO_COMPANY_DATA, self.styles['IVEONormal']))
             return
-        
-        # Récupérer les entreprises sélectionnées depuis les cookies
         selected_companies = self._get_selected_companies(df_ent)
-        
-        # Tableau des entreprises
         if selected_companies:
             company_table = self._create_companies_table(df_ent, selected_companies)
             self.story.append(company_table)
-        
         self.story.append(PageBreak())
     
     def _get_selected_companies(self, df_ent):
@@ -221,22 +265,20 @@ class IVEOPDFGenerator:
     
     def _create_companies_table(self, df_ent, selected_companies):
         """Crée le tableau des entreprises pour le PDF."""
-        company_data = [["Entreprise", "Secteur", "Localisation", "Statut"]]
-        
-        for company in selected_companies[:10]:  # Limiter à 10 entreprises
+        company_data = [TABLE_COMPANY_HEADER]
+        for company in selected_companies[:COMPANY_MAX]:
             company_info = df_ent[df_ent.iloc[:, 0] == company]
             if not company_info.empty:
                 info = company_info.iloc[0]
-                sector = info.get("Secteur d'activité", "N/A")
-                location = info.get("Localisation", "N/A")
-                status = info.get("Statut", "N/A")
+                sector = info.get(COMPANY_COL_SECTOR, "N/A")
+                location = info.get(COMPANY_COL_LOCATION, "N/A")
+                status = info.get(COMPANY_COL_STATUS, "N/A")
                 company_data.append([
-                    str(company)[:30],  # Limiter la longueur
+                    str(company)[:30],
                     str(sector)[:20],
                     str(location)[:20],
                     str(status)[:15]
                 ])
-        
         company_table = Table(company_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1*inch])
         company_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), IVEO_BLUE),
@@ -254,13 +296,10 @@ class IVEOPDFGenerator:
     
     def _add_solutions_analysis(self, df_sol):
         """Ajoute l'analyse des solutions."""
-        self.story.append(Paragraph("3. Analyse des solutions", self.styles['IVEOSubtitle']))
-        
+        self.story.append(Paragraph(TITLE_SOLUTIONS, self.styles['IVEOSubtitle']))
         if df_sol is None or df_sol.empty:
-            self.story.append(Paragraph("Aucune donnée de solution disponible.", self.styles['IVEONormal']))
+            self.story.append(Paragraph(LABEL_NO_SOLUTION_DATA, self.styles['IVEONormal']))
             return
-        
-        # Récupérer la solution sélectionnée depuis les cookies
         selected_solution = ""
         try:
             selected_solution_json = cookies.get("solution_selected", "[]")
@@ -269,33 +308,23 @@ class IVEOPDFGenerator:
                 selected_solution = selected_solutions[0]
         except (json.JSONDecodeError, TypeError):
             pass
-        
-        # Tableau des solutions
-        solution_column = None
-        for col in df_sol.columns:
-            if 'solution' in col.lower():
-                solution_column = col
-                break
-        
+        solution_column = next((col for col in df_sol.columns if 'solution' in col.lower()), None)
         if solution_column:
-            solutions_to_show = [selected_solution] if selected_solution else df_sol[solution_column].dropna().unique().tolist()[:5]
-            
-            solution_data = [["Solution", "Catégorie", "Fournisseur", "Statut"]]
-            
+            solutions_to_show = [selected_solution] if selected_solution else df_sol[solution_column].dropna().unique().tolist()[:SOLUTION_MAX]
+            solution_data = [TABLE_SOLUTION_HEADER]
             for solution in solutions_to_show:
                 solution_info = df_sol[df_sol[solution_column] == solution]
                 if not solution_info.empty:
                     info = solution_info.iloc[0]
-                    category = info.get("Catégorie", "N/A")
-                    provider = info.get("Fournisseur", "N/A") 
-                    status = info.get("Statut", "N/A")
+                    category = info.get(SOLUTION_COL_CATEGORY, "N/A")
+                    provider = info.get(SOLUTION_COL_PROVIDER, "N/A") 
+                    status = info.get(SOLUTION_COL_STATUS, "N/A")
                     solution_data.append([
                         str(solution)[:30],
                         str(category)[:20],
                         str(provider)[:20],
                         str(status)[:15]
                     ])
-            
             solution_table = Table(solution_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1*inch])
             solution_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), IVEO_BLUE),
@@ -310,50 +339,36 @@ class IVEOPDFGenerator:
                 ('FONTSIZE', (0, 1), (-1, -1), 9)
             ]))
             self.story.append(solution_table)
-        
         self.story.append(PageBreak())
     
     def _add_comparative_analysis(self, df_comp):
         """Ajoute l'analyse comparative."""
-        self.story.append(Paragraph("4. Analyse comparative", self.styles['IVEOSubtitle']))
-        
+        self.story.append(Paragraph(TITLE_COMPARATIVE, self.styles['IVEOSubtitle']))
         if df_comp is None or df_comp.empty:
-            self.story.append(Paragraph("Aucune donnée d'analyse comparative disponible.", self.styles['IVEONormal']))
+            self.story.append(Paragraph(LABEL_NO_COMP_DATA, self.styles['IVEONormal']))
             return
-        
-        # Récupérer les filtres appliqués
         try:
             selected_categories = json.loads(cookies.get("selected_categories", "[]"))
             selected_companies = json.loads(cookies.get("selected_companies", "[]"))
         except (json.JSONDecodeError, TypeError):
             selected_categories = []
             selected_companies = []
-        
-        # Résumé des filtres appliqués
         if selected_categories or selected_companies:
-            self.story.append(Paragraph("Filtres appliqués:", self.styles['IVEOSection']))
-            
+            self.story.append(Paragraph(LABEL_FILTERS_APPLIED, self.styles['IVEOSection']))
             if selected_categories:
-                cat_text = f"Catégories: {', '.join(selected_categories)}"
+                cat_text = LABEL_CATEGORIES.format(categories=", ".join(selected_categories))
                 self.story.append(Paragraph(cat_text, self.styles['IVEONormal']))
-            
             if selected_companies:
-                comp_text = f"Entreprises: {', '.join(selected_companies)}"
+                comp_text = LABEL_COMPANIES.format(companies=", ".join(selected_companies))
                 self.story.append(Paragraph(comp_text, self.styles['IVEONormal']))
-        
-        # Tableau d'analyse comparative (premiers critères)
         if len(df_comp) > 0:
-            # Prendre les premières colonnes importantes
-            comparison_data = [["Type d'exigence", "Domaine", "Exigence différenciateur", "Exigence"]]
-            
-            for idx, row in df_comp.head(15).iterrows():  # Limiter à 15 critères
-                type_exigence = str(row.get("Type d'exigence", "N/A"))[:30]
-                domaine = str(row.get("Domaine", "N/A"))[:30]
-                exigence_diff = str(row.get("Exigence différenciateur", "N/A"))[:20]
-                exigence = str(row.get("Exigence", "N/A"))[:40]
-                
+            comparison_data = [TABLE_COMPARISON_HEADER]
+            for _, row in df_comp.head(COMPARISON_MAX).iterrows():
+                type_exigence = str(row.get(COMPARISON_COL_TYPE, "N/A"))[:30]
+                domaine = str(row.get(COMPARISON_COL_DOMAIN, "N/A"))[:30]
+                exigence_diff = str(row.get(COMPARISON_COL_DIFF, "N/A"))[:20]
+                exigence = str(row.get(COMPARISON_COL_REQ, "N/A"))[:40]
                 comparison_data.append([type_exigence, domaine, exigence_diff, exigence])
-            
             comparison_table = Table(comparison_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
             comparison_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), IVEO_BLUE),
@@ -368,49 +383,18 @@ class IVEOPDFGenerator:
                 ('FONTSIZE', (0, 1), (-1, -1), 8)
             ]))
             self.story.append(comparison_table)
-        
         self.story.append(PageBreak())
     
     def _add_recommendations(self):
         """Ajoute les recommandations."""
-        self.story.append(Paragraph("5. Recommandations", self.styles['IVEOSubtitle']))
-        
-        recommendations_text = """
-        Basé sur l'analyse comparative réalisée, voici les principales recommandations :
-        
-        • Prioriser les solutions qui répondent aux exigences critiques identifiées
-        • Considérer les aspects de compatibilité et d'intégration avec l'infrastructure existante
-        • Évaluer le rapport coût-bénéfice pour chaque solution candidate
-        • Planifier une phase pilote pour valider les solutions présélectionnées
-        • Prévoir une stratégie de formation et d'accompagnement au changement
-        
-        Ces recommandations doivent être adaptées selon le contexte spécifique de l'organisation
-        et les contraintes opérationnelles identifiées.
-        """
-        
-        self.story.append(Paragraph(recommendations_text, self.styles['IVEONormal']))
-        
+        self.story.append(Paragraph(TITLE_RECOMMENDATIONS, self.styles['IVEOSubtitle']))
+        self.story.append(Paragraph(RECOMMENDATIONS_TEXT, self.styles['IVEONormal']))
         self.story.append(PageBreak())
     
     def _add_annexes(self):
         """Ajoute les annexes."""
-        self.story.append(Paragraph("6. Annexes", self.styles['IVEOSubtitle']))
-        
-        annexes_text = """
-        Méthodologie d'évaluation:
-        - Critères d'évaluation binaires (0/1)
-        - Pondération selon les exigences métier
-        - Validation par les parties prenantes
-        
-        Sources des données:
-        - Fichier Excel d'analyse comparative
-        - Données fournisseurs
-        - Évaluations internes
-        
-        Glossaire des termes techniques disponible sur demande.
-        """
-        
-        self.story.append(Paragraph(annexes_text, self.styles['IVEONormal']))
+        self.story.append(Paragraph(TITLE_ANNEXES, self.styles['IVEOSubtitle']))
+        self.story.append(Paragraph(ANNEXES_TEXT, self.styles['IVEONormal']))
     
     def generate_pdf(self, df_ent, df_sol, df_comp, df_align=None):
         """
@@ -445,28 +429,24 @@ class IVEOPDFGenerator:
 def create_download_link(buffer, filename):
     """
     Crée un lien de téléchargement pour le PDF.
-    
     Args:
         buffer (BytesIO): Buffer contenant le PDF
         filename (str): Nom du fichier
-        
     Returns:
         str: HTML du lien de téléchargement
     """
     b64 = base64.b64encode(buffer.getvalue()).decode()
-    href = f'<a href="data:application/pdf;base64,{b64}" download="{filename}" style="display: inline-block; color: #fff; background-color: #0072B2; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; margin: 10px 0;">📄 Télécharger le rapport PDF</a>'
+    href = f'<a href="data:application/pdf;base64,{b64}" download="{filename}" style="{DOWNLOAD_STYLE}">{DOWNLOAD_LABEL}</a>'
     return href
 
 def generate_report_pdf(df_ent, df_sol, df_comp, df_align=None):
     """
     Fonction principale pour générer le rapport PDF.
-    
     Args:
         df_ent (pd.DataFrame): Données des entreprises
         df_sol (pd.DataFrame): Données des solutions
         df_comp (pd.DataFrame): Données d'analyse comparative
         df_align (pd.DataFrame): Données d'alignement (optionnel)
-        
     Returns:
         BytesIO: Buffer contenant le PDF généré
     """
@@ -475,5 +455,5 @@ def generate_report_pdf(df_ent, df_sol, df_comp, df_align=None):
         buffer = generator.generate_pdf(df_ent, df_sol, df_comp, df_align)
         return buffer
     except Exception as e:
-        st.error(f"Erreur lors de la génération du PDF : {str(e)}")
+        st.error(ERROR_PDF_GEN.format(error=str(e)))
         return None

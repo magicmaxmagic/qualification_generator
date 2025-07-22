@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.pages.home import get_available_entreprises, COLS_DESCRIPTION, LABEL_INFORMATION_COMPLEMENTAIRE
 """
 Page Analyse Comparative - Application IVÉO BI
 ==============================================
@@ -20,7 +24,9 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
 from sidebar import show_sidebar, show_sidebar_alignement, apply_sidebar_styles
 
-# Constantes
+
+
+# === CONSTANTES GLOBALES (labels, messages, couleurs, etc.) ===
 NO_INFO_MESSAGE = "Aucune information complémentaire disponible"
 COL_FONCTIONNALITES = "Type d'exigence"
 COL_CATEGORIES = "Domaine"
@@ -28,6 +34,42 @@ COL_EXIGENCE = "Exigence différenciateur"
 COL_DESCRIPTION = "Exigence"
 COL_INFO_COMP = "Information complémentaire"
 SELECTION_COL = "Sélection"
+
+# Labels et couleurs pour les badges
+BADGE_RESPECTE_COLOR = "#28a745"
+BADGE_RESPECTE_TEXT = "1"
+BADGE_RESPECTE_LABEL = "Critère respecté"
+BADGE_RESPECTE_CARD_COLOR = "#d4edda"
+
+BADGE_NON_RESPECTE_COLOR = "#dc3545"
+BADGE_NON_RESPECTE_TEXT = "0"
+BADGE_NON_RESPECTE_LABEL = "Critère non respecté"
+BADGE_NON_RESPECTE_CARD_COLOR = "#f8d7da"
+
+BADGE_NON_EVALUE_COLOR = "#6c757d"
+BADGE_NON_EVALUE_TEXT = "N/A"
+BADGE_NON_EVALUE_LABEL = "Non évalué"
+BADGE_NON_EVALUE_CARD_COLOR = "#e2e3e5"
+
+# Labels pour la sidebar et les messages utilisateur
+LABEL_PARAM_COMPARAISON = "Paramètres de comparaison"
+LABEL_SELECT_ENTREPRISES = "Sélectionnez les entreprises à comparer :"
+LABEL_SELECT_ENTREPRISES_HELP = "Choisissez les entreprises que vous souhaitez comparer."
+LABEL_FILTRES = "Filtres"
+LABEL_FILTRE_TYPE_EXIGENCE = "Filtrer par type d'exigence :"
+LABEL_FILTRE_TYPE_EXIGENCE_HELP = "Sélectionnez les types d'exigence à afficher."
+LABEL_FILTRE_CATEGORIE = "Filtrer par catégorie :"
+LABEL_FILTRE_CATEGORIE_HELP = "Sélectionnez les catégories à afficher."
+LABEL_FILTRE_EXIGENCE = "Filtrer par exigence différenciatrice :"
+LABEL_FILTRE_EXIGENCE_HELP = "Sélectionnez les niveaux d'exigence à afficher."
+LABEL_WARNING_SELECT_ENTREPRISE = "Veuillez sélectionner au moins une entreprise."
+LABEL_WARNING_NO_DATA = "Aucune donnée ne correspond aux critères sélectionnés."
+LABEL_PAGE_TITLE = "Analyse Comparative"
+LABEL_GRILLE_EVAL = "Grille d'évaluation"
+LABEL_INFOS_COMP = "Informations complémentaires pour : {exigence}"
+LABEL_IMPOSSIBLE_EXIGENCE = "Impossible de récupérer l'exigence depuis la grille"
+LABEL_AUCUNE_LIGNE = "Aucune ligne trouvée pour l'exigence: {exigence}"
+LABEL_AUCUNE_INFO_COMP = "Aucune information complémentaire disponible pour : {exigence}"
 
 
 def display(all_dfs):
@@ -39,40 +81,43 @@ def display(all_dfs):
     """
     # Appliquer les styles de la sidebar
     apply_sidebar_styles()
-    
-    # --- En-tête de la page ---
     _render_page_header()
-    
-    # --- Récupération des données ---
     df_comparative = all_dfs.get("Analyse comparative")
+    df_ent = all_dfs.get("Entreprise")
+    df_sol = all_dfs.get("Solution")
     if df_comparative is None:
         st.error("La feuille 'Analyse comparative' est introuvable dans le fichier Excel.")
         return
-    
-    # --- Validation et préparation des données ---
     success, df_filtered, entreprise_cols, _ = _prepare_data(df_comparative)
     if not success:
         return
-    
-    # --- Interface utilisateur ---
-    selected_entreprises, selected_types_exigence, selected_categories, selected_exigences = _setup_sidebar_controls(entreprise_cols, df_filtered)
-    if not selected_entreprises:
-        st.warning("Veuillez sélectionner au moins une entreprise.")
+    # --- Synchronisation stricte avec la sélection globale de home.py ---
+    available_entreprises = get_available_entreprises(df_ent, df_sol, df_comparative)
+    if not available_entreprises:
+        st.error("Aucune entreprise commune trouvée dans toutes les feuilles.")
         return
-    
-    # Filtrer les données selon les critères sélectionnés
+    # On lit la sélection globale depuis les cookies de session (clé utilisée dans show_sidebar)
+    import json
+    from sidebar import cookies
+    raw = cookies.get('entreprises_selected')
+    selected_entreprises = json.loads(raw) if raw else available_entreprises
+    selected_entreprises = [e for e in selected_entreprises if e in available_entreprises]
+    if not selected_entreprises:
+        st.warning("Veuillez sélectionner au moins une entreprise dans la page d'accueil.")
+        return
+    # --- Interface utilisateur (filtres supplémentaires, sans multiselect entreprises) ---
+    selected_types_exigence, selected_categories, selected_exigences = _setup_sidebar_filters(df_filtered)
     df_filtered_criteria = _filter_data_by_criteria(df_filtered, selected_types_exigence, selected_categories, selected_exigences)
     if df_filtered_criteria is None or df_filtered_criteria.empty:
-        st.warning("Aucune donnée ne correspond aux critères sélectionnés.")
+        st.warning(LABEL_WARNING_NO_DATA)
         return
-    
     # --- Affichage de la grille d'évaluation ---
     _render_evaluation_grid(df_filtered_criteria, selected_entreprises)
 
 
 def _render_page_header():
     """Affiche l'en-tête de la page avec le titre et la description."""
-    st.title("Analyse Comparative")
+    st.title(LABEL_PAGE_TITLE)
 
 
 def _prepare_data(df_comparative):
@@ -139,42 +184,27 @@ def _setup_sidebar_controls(entreprise_cols, df_filtered):
     Returns:
         tuple: (selected_entreprises, selected_types_exigence, selected_categories, selected_exigences)
     """
+def _setup_sidebar_filters(df_filtered):
     with st.sidebar:
-        st.markdown("### Paramètres de comparaison")
-        
-        # Sélection des entreprises - toutes par défaut
-        selected_entreprises = st.multiselect(
-            "Sélectionnez les entreprises à comparer :",
-            options=entreprise_cols,
-            default=entreprise_cols,  # Toutes les entreprises par défaut
-            help="Choisissez les entreprises que vous souhaitez comparer."
-        )
-        
-        st.markdown("---")
-        st.markdown("### Filtres")
-        
+        st.markdown(f"### {LABEL_FILTRES}")
         # Filtre par type d'exigence
         types_exigence_unique = df_filtered[COL_FONCTIONNALITES].dropna().unique()
         selected_types_exigence = st.multiselect(
-            "Filtrer par type d'exigence :",
+            LABEL_FILTRE_TYPE_EXIGENCE,
             options=types_exigence_unique,
             default=types_exigence_unique,
-            help="Sélectionnez les types d'exigence à afficher."
+            help=LABEL_FILTRE_TYPE_EXIGENCE_HELP
         )
-        
         # Filtre par catégorie
         categories_unique = df_filtered[COL_CATEGORIES].dropna().unique()
         selected_categories = st.multiselect(
-            "Filtrer par catégorie :",
+            LABEL_FILTRE_CATEGORIE,
             options=categories_unique,
             default=categories_unique,
-            help="Sélectionnez les catégories à afficher."
+            help=LABEL_FILTRE_CATEGORIE_HELP
         )
-        
         # Filtre par exigence
         exigences_unique = df_filtered[COL_EXIGENCE].dropna().unique()
-        
-        # Transformer les valeurs 0 et 1 en "Non" et "Oui"
         def transform_exigence_value(value):
             if str(value) == "0" or str(value) == "0.0":
                 return "Non"
@@ -182,22 +212,16 @@ def _setup_sidebar_controls(entreprise_cols, df_filtered):
                 return "Oui"
             else:
                 return str(value)
-        
-        # Créer un mapping pour les valeurs transformées
         exigences_display = [transform_exigence_value(val) for val in exigences_unique]
         exigences_mapping = dict(zip(exigences_display, exigences_unique))
-        
         selected_exigences_display = st.multiselect(
-            "Filtrer par exigence différenciatrice :",
+            LABEL_FILTRE_EXIGENCE,
             options=exigences_display,
             default=exigences_display,
-            help="Sélectionnez les niveaux d'exigence à afficher."
+            help=LABEL_FILTRE_EXIGENCE_HELP
         )
-        
-        # Reconvertir les valeurs sélectionnées vers les valeurs originales
         selected_exigences = [exigences_mapping[val] for val in selected_exigences_display]
-    
-    return selected_entreprises, selected_types_exigence, selected_categories, selected_exigences
+    return selected_types_exigence, selected_categories, selected_exigences
 
 
 def _filter_data_by_criteria(df_filtered, selected_types_exigence, selected_categories, selected_exigences):
@@ -234,7 +258,7 @@ def _render_evaluation_grid(df_filtered, selected_entreprises):
         df_filtered (pd.DataFrame): DataFrame filtré des données
         selected_entreprises (list): Liste des entreprises sélectionnées
     """
-    st.markdown("### Grille d'évaluation")
+    st.markdown(f"### {LABEL_GRILLE_EVAL}")
     df_display = _format_scores_for_display(df_filtered, selected_entreprises)
     display_df = _prepare_display_dataframe(df_display, selected_entreprises)
     grid_options, custom_css = _build_aggrid_options(display_df, selected_entreprises)
@@ -371,33 +395,28 @@ def _display_selected_infos(grid_response, df_filtered, selected_entreprises):
     
     if not selected_rows:
         return
-        
     st.markdown("---")
     for row in selected_rows:
         # Récupérer l'exigence depuis la grille
         selected_exigence = row.get(COL_DESCRIPTION)
-        
         if selected_exigence is None:
-            st.warning("Impossible de récupérer l'exigence depuis la grille")
+            st.warning(LABEL_IMPOSSIBLE_EXIGENCE)
             continue
-            
         # Trouver la ligne correspondante dans le DataFrame original
         matching_rows = df_filtered[df_filtered[COL_DESCRIPTION] == selected_exigence]
         if matching_rows.empty:
-            st.warning(f"Aucune ligne trouvée pour l'exigence: {selected_exigence}")
+            st.warning(LABEL_AUCUNE_LIGNE.format(exigence=selected_exigence))
             continue
-            
         idx = matching_rows.index[0]
         row_data = df_filtered.iloc[idx]
         infos_to_display = _get_infos_to_display(row_data, selected_entreprises, df_filtered)
-        
         if infos_to_display:
-            st.markdown(f"### Informations complémentaires pour : {selected_exigence}")
+            st.markdown(LABEL_INFOS_COMP.format(exigence=selected_exigence))
             for entreprise, info_complementaire in infos_to_display:
                 st.markdown(f"**{entreprise}** :")
                 st.info(info_complementaire)
         else:
-            st.info(f"Aucune information complémentaire disponible pour : {selected_exigence}")
+            st.info(LABEL_AUCUNE_INFO_COMP.format(exigence=selected_exigence))
 
 def _get_infos_to_display(row_data, selected_entreprises, df_filtered):
     """Retourne la liste des tuples (entreprise, info_complementaire) à afficher."""
@@ -470,24 +489,24 @@ def _get_badge_info(score_numeric):
     """
     if score_numeric == 1:
         return {
-            "color": "#28a745",
-            "text": "1",
-            "label": "Critère respecté",
-            "card_color": "#d4edda"
+            "color": BADGE_RESPECTE_COLOR,
+            "text": BADGE_RESPECTE_TEXT,
+            "label": BADGE_RESPECTE_LABEL,
+            "card_color": BADGE_RESPECTE_CARD_COLOR
         }
     elif score_numeric == 0:
         return {
-            "color": "#dc3545",
-            "text": "0",
-            "label": "Critère non respecté",
-            "card_color": "#f8d7da"
+            "color": BADGE_NON_RESPECTE_COLOR,
+            "text": BADGE_NON_RESPECTE_TEXT,
+            "label": BADGE_NON_RESPECTE_LABEL,
+            "card_color": BADGE_NON_RESPECTE_CARD_COLOR
         }
     else:
         return {
-            "color": "#6c757d",
-            "text": "N/A",
-            "label": "Non évalué",
-            "card_color": "#e2e3e5"
+            "color": BADGE_NON_EVALUE_COLOR,
+            "text": BADGE_NON_EVALUE_TEXT,
+            "label": BADGE_NON_EVALUE_LABEL,
+            "card_color": BADGE_NON_EVALUE_CARD_COLOR
         }
 
 
