@@ -319,11 +319,12 @@ def show_analyses(df_comp, df_sol, selected_entreprises=None):
         return
 
     entreprises = selected_entreprises
-    color_map = get_color_map(entreprises, entreprises)
     df = clean_and_convert_df(df_comp, entreprises)
-
+    # Filtrer les entreprises pour ne garder que celles présentes dans les colonnes du DataFrame
+    entreprises_valides = [e for e in entreprises if e in df.columns]
+    color_map = get_color_map(entreprises_valides, entreprises_valides)
     st.markdown("---")
-    show_classement_repartition(df, entreprises, color_map)
+    show_classement_repartition(df, entreprises_valides, color_map)
 
     if df_sol is not None and LABEL_ENTREPRISES in df_sol.columns:
         df_sol_filtered = df_sol[df_sol[LABEL_ENTREPRISES].isin(entreprises)]
