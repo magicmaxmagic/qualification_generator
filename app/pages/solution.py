@@ -1027,48 +1027,77 @@ def display(df_sol: pd.DataFrame):
     """
     Fonction principale d'affichage de la page Solution, refactorisée pour une meilleure maintenabilité.
     """
-    # Appliquer les styles modernes à la sidebar
-    apply_sidebar_styles()
-    # Réinitialiser le compteur de section à chaque affichage
-    if 'section_count' not in st.session_state:
-        st.session_state['section_count'] = 0
-    st.session_state['section_count'] = 0
-    # Appliquer les styles CSS de la page
-    _apply_page_styles()
-    # Validation du DataFrame
-    is_valid, result = _validate_dataframe(df_sol)
-    if not is_valid:
-        st.error(result)
-        return
-    solution_column = result
-    solutions = df_sol[solution_column].dropna().unique()
-    # Configuration des éléments d'entrée de la sidebar
-    selected, image_urls, uploaded_images = _setup_sidebar_inputs(list(solutions))
-    # Récupération des informations de la solution sélectionnée
-    info = df_sol[df_sol[solution_column] == selected].iloc[0]
-    cookies['solution_selected'] = json.dumps([selected])
-    # Gestion de la persistance des images
-    persistent_urls, persistent_files = _handle_image_persistence(selected, image_urls, uploaded_images)
-    # Affichage des images persistantes dans la sidebar
-    _render_persistent_images_sidebar(selected, persistent_urls, persistent_files)
-    # Récupération des URLs et de la description
-    url_site, video = _get_solution_urls(info)
-    desc = _get_description(info, df_sol)
-    # Collecte de toutes les images
-    images_urls = _collect_all_images(info, persistent_urls, image_urls)
-    # Affichage du header avec le nom de la solution
+    st.markdown("""
+    <style>
+    .main .block-container {
+        background: linear-gradient(135deg, #e3f0fa 0%, #f8f9fa 50%, #e9ecef 100%);
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+        position: relative;
+        min-height: 100vh;
+    }
+    .main .block-container::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 25% 25%, rgba(0,114,178,0.05) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(227,240,250,0.08) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: -1;
+    }
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 12px rgba(255,255,255,0.08) !important;
+    }
+    .stMultiSelect > div > div {
+        background: rgba(255, 255, 255, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
+    }
+    .stColorPicker > div > div {
+        background: rgba(255, 255, 255, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
+    }
+    .css-1d391kg {
+        background: rgba(255, 255, 255, 0.85) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     render_header(LABEL_FICHE_SOLUTION)
     st.markdown(SEPARATOR, unsafe_allow_html=True)
-    # Création de deux colonnes pour description et nom de la solution
-    col_desc, col_name = st.columns([1, 1])
-    with col_desc:
-        _render_description_section(desc)
-    with col_name:
-        render_logo_and_name(selected, info.get('URL (logo)', ''), THEME['accent'], url_site, video)
-    st.markdown(SEPARATOR, unsafe_allow_html=True)
-    # Affichage du contenu principal
-    # Si des images sont disponibles, afficher avec images, sinon sans images
-    if images_urls or persistent_files:
-        _render_info_with_images(df_sol, solution_column, info, images_urls, persistent_files)
-    else:
-        _render_info_without_images(df_sol, solution_column, info)
+    # Sélection globale d'entreprise(s)
+    if df_sol is None or df_sol.empty or LABEL_ENTREPRISES not in df_sol.columns:
+        st.error("Aucune donnée d'entreprise disponible.")
+        return
+    entreprises = df_sol[LABEL_ENTREPRISES].dropna().unique().tolist()
+    selected = show_sidebar(
+        label=LABEL_CHOISISSEZ_ENTREPRISE,
+        options=entreprises,
+        default=entreprises[:1],
+        multiselect=False
+    )
+    
+    # Filtrer le DataFrame selon la sélection
+    info = df_sol[df_sol[LABEL_ENTREPRISES].isin(selected)].iloc[0] if selected else df_sol.iloc[0]
+    color = THEME['accent']
+    selected_fields = df_sol.columns.tolist()[:4]  # Par défaut, les 4 premiers champs
+    col_left, col_right = st.columns([1, 1])
+    with col_left:
+        render_left_column(info, selected_fields)
+    with col_right:
+        url_site = get_url_site(info)
+        video = info.get('URL (vidéo)', '')
+        render_logo_section(selected, info, color, url_site, video)
+        st.markdown(SEPARATOR, unsafe_allow_html=True)
+        render_description_section(info)
+        st.markdown(SEPARATOR, unsafe_allow_html=True)
+        render_map_section(info)

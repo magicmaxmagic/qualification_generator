@@ -1,13 +1,3 @@
-# Utilitaire pour obtenir la liste cohérente des entreprises présentes dans toutes les feuilles nécessaires
-def get_available_entreprises(df_ent=None, df_sol=None, df_comp=None):
-    # Retourne toutes les entreprises de la feuille Entreprise
-    if df_ent is not None and LABEL_ENTREPRISES in df_ent.columns:
-        return sorted(list(df_ent[LABEL_ENTREPRISES].dropna().unique()))
-    return []
-# app/pages/home.py
-
-
-
 import streamlit as st
 import plotly.express as px
 import pandas as pd
@@ -60,7 +50,7 @@ PLOTLY_TEMPLATE = "simple_white"
 
 HTML_HR = "<hr style='margin:0.5em 0 1.2em 0; border:0; border-top:1.5px solid #eee;'>"
 
-TITRE_HEADER = "Qualification BI – Vue d'ensemble"
+TITRE_HEADER = "Qualification"
 TITRE_LOGOS = "Nos entreprises participantes"
 TITRE_FRISE = "Année de création des entreprises"
 TITRE_CLASSEMENT = "Classement des entreprises par score global"
@@ -95,9 +85,10 @@ def display(all_dfs: dict):
     ) if available_entreprises else []
     show_bandeau_summary(df_ent, df_sol, df_comp, selected_entreprises)
     show_logos(df_ent, selected_entreprises)
+    show_costs(df_sol)
     # Toutes les analyses doivent utiliser la même sélection globale !
-    show_frise(df_ent, selected_entreprises)
-    show_analyses(df_comp, df_sol, selected_entreprises)
+    #show_frise(df_ent, selected_entreprises)
+    # show_analyses(df_comp, df_sol, selected_entreprises)
 
 def show_bandeau_summary(df_ent, df_sol, df_comp, selected_entreprises=None):
     """Affiche le bandeau récapitulatif avec le nombre d'entreprises, solutions, exigences, filtré si besoin."""
@@ -106,6 +97,12 @@ def show_bandeau_summary(df_ent, df_sol, df_comp, selected_entreprises=None):
     nb_exigences = _filtered_exigence_count(df_comp)
     _display_bandeau_items(nb_entreprises, nb_solutions, nb_exigences)
     st.markdown("---")
+
+def get_available_entreprises(df_ent=None, df_sol=None, df_comp=None):
+    # Retourne toutes les entreprises de la feuille Entreprise
+    if df_ent is not None and LABEL_ENTREPRISES in df_ent.columns:
+        return sorted(list(df_ent[LABEL_ENTREPRISES].dropna().unique()))
+    return []
 
 def inject_responsive_css():
     st.markdown(
@@ -182,7 +179,44 @@ def _display_bandeau_items(nb_entreprises, nb_solutions, nb_exigences):
             )
 
 
+def _get_logo_url(row, url_logo_col):
+    """Helper to get logo URL from a row, fallback to default if missing."""
+    if url_logo_col and url_logo_col in row and pd.notna(row[url_logo_col]) and str(row[url_logo_col]).strip():
+        return row[url_logo_col]
+    return IMG_ENTREPRISE
+
 def show_logos(df_ent, selected_entreprises=None):
+    def _find_url_logo_col(cols):
+        import unicodedata
+        def normalize(s):
+            return ''.join([c for c in unicodedata.normalize('NFKD', str(s)) if not unicodedata.combining(c)]).replace(' ', '').lower()
+        for col in cols:
+            if normalize(col) in [normalize('URL (logo)'), 'urllogo', 'logo', 'url_logo', 'url', 'logourl']:
+                return col
+        return None
+
+    def _render_single_logo(row, url_logo_col):
+        st.markdown('<div style="display:flex;justify-content:center;">', unsafe_allow_html=True)
+        logo_url = _get_logo_url(row, url_logo_col)
+        st.markdown(f"""
+<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px;'>
+    <img src='{logo_url}' width='70' style='display:block;margin:0 auto 0.2em auto;' />
+    <div style='text-align:center; font-size:0.95em; color:#555; font-weight:500;'>{row[LABEL_ENTREPRISES]}</div>
+</div>
+""", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    def _render_two_logos(logos, url_logo_col):
+        cols = st.columns(2)
+        for i, (_, row) in enumerate(logos.iterrows()):
+            with cols[i]:
+                logo_url = _get_logo_url(row, url_logo_col)
+                st.markdown(f"""
+<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px;'>
+    <img src='{logo_url}' width='70' style='display:block;margin:0 auto 0.2em auto;' />
+    <div style='text-align:center; font-size:0.95em; color:#555; font-weight:500;'>{row[LABEL_ENTREPRISES]}</div>
+</div>
+""", unsafe_allow_html=True)
     """Affiche les logos des entreprises participantes."""
     if df_ent is None or LABEL_ENTREPRISES not in df_ent.columns:
         return
@@ -200,232 +234,83 @@ def show_logos(df_ent, selected_entreprises=None):
     logos = df_ent[[c for c in [url_logo_col, LABEL_ENTREPRISES] if c in df_ent.columns]].copy() if url_logo_col else df_ent[[LABEL_ENTREPRISES]].copy()
     n_logos = len(logos)
 
+    n_logos = len(logos)
     if n_logos == 1:
         _render_single_logo(logos.iloc[0], url_logo_col)
     elif n_logos == 2:
         _render_two_logos(logos, url_logo_col)
     elif n_logos > 2:
         _render_multiple_logos(logos, url_logo_col)
-    # Suppression de la ligne horizontale ici pour éviter la multiplication des lignes
-
-def _find_url_logo_col(cols):
-    import unicodedata
-    def normalize(s):
-        return ''.join([c for c in unicodedata.normalize('NFKD', str(s)) if not unicodedata.combining(c)]).replace(' ', '').lower()
-    for col in cols:
-        if normalize(col) in [normalize('URL (logo)'), 'urllogo', 'logo', 'url_logo', 'url', 'logourl']:
-            return col
-    return None
-
-def _get_logo_url(row, url_logo_col):
-    if url_logo_col and url_logo_col in row and pd.notna(row[url_logo_col]):
-        return row[url_logo_col]
-    return IMG_ENTREPRISE
-
-def _render_single_logo(row, url_logo_col):
-    st.markdown('<div style="display:flex;justify-content:center;">', unsafe_allow_html=True)
-    logo_url = _get_logo_url(row, url_logo_col)
-    st.markdown(f'''
-<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px;">
-    <img src="{logo_url}" width="70" style="display:block;margin:0 auto 0.2em auto;" />
-    <div style="text-align:center; font-size:0.95em; color:#555; font-weight:500;">{row[LABEL_ENTREPRISES]}</div>
-</div>
-''', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def _render_two_logos(logos, url_logo_col):
-    cols = st.columns(2)
-    for i, (_, row) in enumerate(logos.iterrows()):
-        with cols[i]:
-            logo_url = _get_logo_url(row, url_logo_col)
-            st.markdown(f'''
-<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px;">
-    <img src="{logo_url}" width="70" style="display:block;margin:0 auto 0.2em auto;" />
-    <div style="text-align:center; font-size:0.95em; color:#555; font-weight:500;">{row[LABEL_ENTREPRISES]}</div>
-</div>
-''', unsafe_allow_html=True)
 
 def _render_multiple_logos(logos, url_logo_col):
+
     n_logos = len(logos)
-    n_cols = min(6, n_logos)
-    cols = st.columns(n_cols)
-    for i, (_, row) in enumerate(logos.iterrows()):
-        with cols[i % n_cols]:
-            logo_url = _get_logo_url(row, url_logo_col)
-            st.markdown(f'''
-<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;width:100%;">
-    <img src="{logo_url}" width="70" style="display:block;margin:0 auto 0.2em auto;" />
-    <div style="text-align:center; font-size:0.95em; color:#555; font-weight:500;">{row[LABEL_ENTREPRISES]}</div>
-</div>
-''', unsafe_allow_html=True)
-
-
-def show_frise(df_ent, selected_entreprises=None):
-    """Affiche la frise chronologique des années de création des entreprises, filtrée si besoin."""
-    def _show_frise(df_ent, selected_entreprises=None):
-        st.markdown(f"<div style='text-align:center; font-size:1.15em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_FRISE}</div>", unsafe_allow_html=True)
-        if df_ent is not None and LABEL_ANNEE_FONDATION in df_ent.columns and LABEL_ENTREPRISES in df_ent.columns:
-            df_annee = df_ent[[LABEL_ENTREPRISES, LABEL_ANNEE_FONDATION]].dropna()
-            if selected_entreprises is not None:
-                df_annee = df_annee[df_annee[LABEL_ENTREPRISES].isin(selected_entreprises)]
-            df_annee = df_annee[pd.to_numeric(df_annee[LABEL_ANNEE_FONDATION], errors="coerce").notna()]
-            df_annee[LABEL_ANNEE_FONDATION] = pd.to_numeric(df_annee[LABEL_ANNEE_FONDATION], errors="coerce")
-            if not df_annee.empty:
-                import plotly.graph_objects as go
-                couleurs = px.colors.qualitative.Plotly
-                fig = go.Figure()
-                for i, row in df_annee.iterrows():
-                    fig.add_trace(go.Scatter(
-                        x=[row[LABEL_ANNEE_FONDATION]],
-                        y=[0],
-                        mode="markers+text",
-                        marker=dict(size=28, color=couleurs[i%len(couleurs)], opacity=0.9, line=dict(width=2, color="#fff")),
-                        text=[row[LABEL_ENTREPRISES]],
-                        textposition="top center",
-                        name=str(row[LABEL_ENTREPRISES])
-                    ))
-                fig.add_shape(type="line", x0=df_annee[LABEL_ANNEE_FONDATION].min()-1, x1=df_annee[LABEL_ANNEE_FONDATION].max()+1, y0=0, y1=0,
-                              line=dict(color="#bbb", width=3), layer="below")
-                fig.update_layout(
-                    xaxis_title=LABEL_ANNEE_CREATION,
-                    yaxis_title="",
-                    yaxis=dict(showticklabels=False, showgrid=False, zeroline=False, fixedrange=True),
-                    xaxis=dict(showgrid=False),
-                    margin=PLOTLY_MARGIN,
-                    plot_bgcolor=PLOTLY_BG,
-                    showlegend=False,
-                    height=PLOTLY_HEIGHT
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Aucune donnée d'année de création exploitable.")
+    n_cols = 5
+    start = 0
+    while start < n_logos:
+        row_logos = logos.iloc[start:start+3]
+        num_in_row = len(row_logos)
+        cols = st.columns(n_cols)
+        # Placement des colonnes selon le nombre de logos dans la ligne
+        if num_in_row == 1:
+            positions = [2]
+        elif num_in_row == 2:
+            positions = [1,3]
         else:
-            st.info(f"Colonne '{LABEL_ANNEE_FONDATION}' ou '{LABEL_ENTREPRISES}' non trouvée dans la feuille Entreprise.")
-    # Appel avec sélection
-    _show_frise(df_ent, selected_entreprises)
+            positions = [0,2,4]
+        for i in range(n_cols):
+            if i not in positions:
+                with cols[i]:
+                    st.markdown("<div></div>", unsafe_allow_html=True)
+        for idx, (_, row) in enumerate(row_logos.iterrows()):
+            col_pos = positions[idx]
+            with cols[col_pos]:
+                logo_url = _get_logo_url(row, url_logo_col)
+                st.markdown(f"""
+<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;width:100%;'>
+    <img src='{logo_url}' width='70' style='display:block;margin:0 auto 0.2em auto;' />
+    <div style='text-align:center; font-size:0.95em; color:#555; font-weight:500;'>{row[LABEL_ENTREPRISES]}</div>
+</div>
+""", unsafe_allow_html=True)
+        start += 3
 
 
-def show_analyses(df_comp, df_sol, selected_entreprises=None):
-    """
-    Affiche la partie analytique principale : sidebar, sélection, couleurs, classement, répartition, coûts.
-    """
-    if df_comp is None:
-        st.error("La feuille 'Comparatif' est introuvable dans le fichier Excel.")
-        return
-
-    # Utiliser strictement la sélection globale passée en paramètre
-    if selected_entreprises is None or not selected_entreprises:
-        st.warning("Veuillez sélectionner au moins une entreprise.")
-        return
-
-    entreprises = selected_entreprises
-    df = clean_and_convert_df(df_comp, entreprises)
-    # Filtrer les entreprises pour ne garder que celles présentes dans les colonnes du DataFrame
-    entreprises_valides = [e for e in entreprises if e in df.columns]
-    color_map = get_color_map(entreprises_valides, entreprises_valides)
-    st.markdown("---")
-    show_classement_repartition(df, entreprises_valides, color_map)
-
-    if df_sol is not None and LABEL_ENTREPRISES in df_sol.columns:
-        df_sol_filtered = df_sol[df_sol[LABEL_ENTREPRISES].isin(entreprises)]
-    else:
-        df_sol_filtered = df_sol
-    show_costs(df_sol_filtered)
-
-def get_color_map(selected, entreprises):
-    st.sidebar.markdown("### Couleurs par entreprise")
-    color_map = {}
-    for ent in selected:
-        KEY_COLOR = f"color_{ent}"
-        raw_col = cookies.get(KEY_COLOR)
-        default_col = raw_col if raw_col else COLOR_DEFAULT
-        col = st.sidebar.color_picker(ent, default_col, key=KEY_COLOR)
-        color_map[ent] = col
-        cookies[KEY_COLOR] = col
-    valid_keys = {f"color_{e}" for e in entreprises}
-    for k in list(cookies.keys()):
-        if k.startswith("color_") and k not in valid_keys:
-            del cookies[k]
-    raw_hist = cookies.get(KEY_HIST_COLOR)
-    default_hist = raw_hist if raw_hist else COLOR_DEFAULT
-    hist_color = st.sidebar.color_picker(LABEL_HIST_COLOR, default_hist, key=KEY_HIST_COLOR)
-    cookies[KEY_HIST_COLOR] = hist_color
-    return color_map
-
-def clean_and_convert_df(df_comp, selected):
-    df = df_comp.copy()
-    # Ne garder que les entreprises présentes dans les colonnes du comparatif
-    selected_cols = [col for col in selected if col in df.columns]
-    df = df[[*COLS_DESCRIPTION, *selected_cols] if COLS_DESCRIPTION else selected_cols]
-    for col in selected_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    return df
-
-
-def show_classement_repartition(df, selected, color_map):
-    """Affiche le classement et la répartition des scores côte à côte."""
-    # La ligne horizontale est désormais gérée par la fonction appelante (show_analyses)
-    col_left, col_right = st.columns(2, gap="medium")
-    # Classement à gauche
-    classement = []
-    for col in selected:
-        col_data = pd.to_numeric(df[col], errors="coerce")
-        score = col_data.sum()
-        classement.append({LABEL_ENTREPRISES: col, SCORE_GLOBAL: score})
-    df_classement = pd.DataFrame(classement).sort_values(SCORE_GLOBAL, ascending=False)
-    fig_class = px.bar(
-        df_classement,
-        x=LABEL_ENTREPRISES,
-        y=SCORE_GLOBAL,
-        color=LABEL_ENTREPRISES,
-        color_discrete_map=color_map,
-        template=PLOTLY_TEMPLATE,
-        labels={SCORE_GLOBAL: SCORE_GLOBAL, LABEL_ENTREPRISES: LABEL_ENTREPRISES}
-    )
-    fig_class.update_layout(margin=PLOTLY_MARGIN, xaxis_title=LABEL_ENTREPRISES, yaxis_title=SCORE_GLOBAL)
-    # Répartition à droite
-    repartition = []
-    for col in selected:
-        col_data = pd.to_numeric(df[col], errors="coerce")
-        count_1 = (col_data == 1).sum()
-        count_0 = (col_data == 0).sum()
-        repartition.append({LABEL_ENTREPRISES: col, LABEL_RESPECTE: count_1, LABEL_NON_RESPECTE: count_0})
-    rep_df = pd.DataFrame(repartition)
-    rep_df = rep_df.set_index(LABEL_ENTREPRISES)
-    fig_rep = px.bar(
-        rep_df,
-        x=rep_df.index,
-        y=[LABEL_RESPECTE, LABEL_NON_RESPECTE],
-        barmode="group",
-        color_discrete_map={LABEL_RESPECTE: COLOR_REP_OK, LABEL_NON_RESPECTE: COLOR_REP_NOK},
-        template=PLOTLY_TEMPLATE,
-        labels={"value": LABEL_NB_CRITERES, "variable": LABEL_STATUT, LABEL_ENTREPRISES: LABEL_ENTREPRISES}
-    )
-    fig_rep.update_layout(margin=PLOTLY_MARGIN, xaxis_title=LABEL_ENTREPRISES, yaxis_title=LABEL_NB_CRITERES)
-    with col_left:
-        st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_CLASSEMENT}</div>", unsafe_allow_html=True)
-        st.plotly_chart(fig_class, use_container_width=True, key=KEY_PLOTLY_CLASS)
-    with col_right:
-        st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_REPARTITION}</div>", unsafe_allow_html=True)
-        st.plotly_chart(fig_rep, use_container_width=True, key=KEY_PLOTLY_REP)
-
-
+#     df_classement = pd.DataFrame(classement).sort_values(SCORE_GLOBAL, ascending=False)
+#     fig_class = px.bar(
+#         df_classement,
+#         x=LABEL_ENTREPRISES,
+#         y=SCORE_GLOBAL,
+#     with col_left:
+#         st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_CLASSEMENT}</div>", unsafe_allow_html=True)
+#         st.plotly_chart(fig_class, use_container_width=True, key=KEY_PLOTLY_CLASS)
+#     with col_right:
+#         st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_REPARTITION}</div>", unsafe_allow_html=True)
+    n_logos = len(logos)
+    n_cols = 5
+    if n_logos == 4:
+        # Ligne 1 : colonnes 0,2,4 (logos 1,2,3)
+        cols = st.columns(n_cols)
+        for i in range(n_cols):
+            if i not in [0,2,4]:
+                with cols[i]:
+                    st.markdown("<div></div>", unsafe_allow_html=True)
+        for idx in range(3):
+            with cols[[0,2,4][idx]]:
+                logo_url = _get_logo_url(logos.iloc[idx], url_logo_col)
+                
 def show_costs(df_sol):
-    """Affiche le comparatif prévisionnel des coûts par entreprise."""
+    # Affiche le comparatif prévisionnel des coûts par entreprise.
     st.markdown("---")
     st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_COST}</div>", unsafe_allow_html=True)
     if _show_costs_info_if_missing(df_sol):
         return
-
     col_init, col_rec, col_ent = _find_cost_columns(df_sol)
     if _show_costs_info_if_invalid_columns(col_init, col_rec, col_ent):
         return
-
     mois = _show_costs_sidebar_slider()
     df_plot = _prepare_cost_dataframe(df_sol, col_ent, col_init, col_rec, mois)
     if _show_costs_info_if_no_data(df_plot):
         return
-
     fig = _build_cost_bar_chart(df_plot)
     st.plotly_chart(fig, use_container_width=True, key=KEY_PLOTLY_COST)
 

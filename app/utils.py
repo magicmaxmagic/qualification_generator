@@ -4,7 +4,7 @@ TEMP_IMAGE_DIR = "/tmp/excel_images"
 EXCEL_IMAGE_FILENAME = "image_{idx}_row_{row}.png"
 SHEET_COMP_NAMES = ["Analyse comparative", "Comparatif"]
 SHEET_ENT_NAMES = ["Entreprises", "Entreprise"]
-SHEET_ALIGN_NAMES = ["Evaluation de la finalité", "Alignement avec le besoin"]
+SHEET_ALIGN_NAMES = ["Analyse comparative"]
 SHEET_SOL_NAMES = ["Solutions", "Solution"]
 ERROR_SHEET_COMP = "Feuille 'Analyse comparative' ou 'Comparatif' introuvable. Feuilles disponibles : {available_sheets}"
 ERROR_SHEET_ENT = "Feuille 'Entreprise' ou 'Entreprises' introuvable. Feuilles disponibles : {available_sheets}"
@@ -100,23 +100,14 @@ def load_data(file):
     df_comp = pd.read_excel(xls, sheet_name=sheet_comp, engine="openpyxl")
     sheet_ent = _find_sheet(available_sheets, SHEET_ENT_NAMES, ERROR_SHEET_ENT)
     df_ent = pd.read_excel(xls, sheet_name=sheet_ent, engine="openpyxl")
-    # Chargement optionnel de la feuille d'alignement
-    sheet_align = None
-    df_align = None
-    for name in SHEET_ALIGN_NAMES:
-        if name in available_sheets:
-            sheet_align = name
-            df_align = pd.read_excel(xls, sheet_name=sheet_align, engine="openpyxl")
-            break
-    if df_align is None:
-        print(f"Aucune feuille d'alignement trouvée. Feuilles attendues : {SHEET_ALIGN_NAMES}. Feuilles disponibles : {available_sheets}")
+    sheet_align = _find_sheet(available_sheets, SHEET_ALIGN_NAMES, ERROR_SHEET_ALIGN)
+    df_align = pd.read_excel(xls, sheet_name=sheet_align, engine="openpyxl")
     sheet_sol = _find_sheet(available_sheets, SHEET_SOL_NAMES, ERROR_SHEET_SOL)
     df_sol = pd.read_excel(xls, sheet_name=sheet_sol, engine="openpyxl")
     # --- Nettoyage basique des colonnes ---
     df_comp.columns  = [str(col).strip() for col in df_comp.columns]
     df_ent.columns   = [str(col).strip() for col in df_ent.columns]
-    if df_align is not None:
-        df_align.columns = [str(col).strip() for col in df_align.columns]
+    df_align.columns = [str(col).strip() for col in df_align.columns]
     df_sol.columns   = [str(col).strip() for col in df_sol.columns]
     # --- Nettoyage des erreurs Excel dans la colonne Logo ---
     if CLEAN_COL_LOGO in df_ent.columns:

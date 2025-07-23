@@ -361,16 +361,9 @@ def sidebar_setup(df_ent):
     cookies['entreprise_selected'] = json.dumps([selected])
     info = df_ent[df_ent[LABEL_ENTREPRISES] == selected].iloc[0]
     color = st.sidebar.color_picker(LABEL_COULEUR_PRINCIPALE, THEME['accent'])
-    # Tous les champs sauf ceux qui commencent par 'URL' ou qui ne contiennent aucune valeur
-    fields = [
-        c for c in df_ent.columns
-        if c not in [LABEL_ENTREPRISES, LABEL_DESCRIPTION, LABEL_URL_LOGO, LABEL_URL_VIDEO, LABEL_LOGO]
-        and not c.strip().lower().startswith('url')
-        and df_ent[c].dropna().astype(str).str.strip().replace('nan', '').replace('', '').any()
-    ]
-    selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, fields, default=fields, key='fields_entreprise')
-    show_map = st.sidebar.checkbox('Afficher la carte de localisation', value=False, key='show_map')
-    return selected, info, color, selected_fields, show_map
+    fields = [c for c in df_ent.columns if c not in [LABEL_ENTREPRISES, LABEL_DESCRIPTION, LABEL_URL_LOGO, LABEL_URL_VIDEO, LABEL_LOGO]]
+    selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, fields, default=fields[:4], key='fields_entreprise')
+    return selected, info, color, selected_fields
 
 def render_left_column(info, selected_fields):
     render_section(LABEL_INFOS_GENERALES)
@@ -617,7 +610,16 @@ def display(df_ent: pd.DataFrame):
         st.error("Aucune donnée d'entreprise disponible.")
         return
     entreprises = df_ent[LABEL_ENTREPRISES].dropna().unique().tolist()
-    selected, info, color, selected_fields, show_map = sidebar_setup(df_ent)
+    selected = show_sidebar(
+        label=LABEL_CHOISISSEZ_ENTREPRISE,
+        options=entreprises,
+        default=entreprises[:1],
+        multiselect=False
+    )
+    # Filtrer le DataFrame selon la sélection
+    info = df_ent[df_ent[LABEL_ENTREPRISES].isin(selected)].iloc[0] if selected else df_ent.iloc[0]
+    color = THEME['accent']
+    selected_fields = df_ent.columns.tolist()[:4]  # Par défaut, les 4 premiers champs
     st.markdown("""
     <style>
     .main .block-container {
@@ -675,5 +677,4 @@ def display(df_ent: pd.DataFrame):
         st.markdown(SEPARATOR, unsafe_allow_html=True)
         render_description_section(info)
         st.markdown(SEPARATOR, unsafe_allow_html=True)
-        if show_map:
-            render_map_section(info)
+        render_map_section(info)
