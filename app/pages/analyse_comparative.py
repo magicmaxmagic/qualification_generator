@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from app.pages.home import get_available_entreprises, COLS_DESCRIPTION, LABEL_INFORMATION_COMPLEMENTAIRE
+from app.pages.home import get_available_entreprises, COLS_DESCRIPTION, LABEL_INFORMATION_COMPLEMENTAIRE, LABEL_ENTREPRISES
 """
 Page Analyse Comparative - Application IVÉO BI
 ==============================================
@@ -92,9 +92,12 @@ def display(all_dfs):
     if not success:
         return
     # --- Synchronisation stricte avec la sélection globale de home.py ---
-    available_entreprises = get_available_entreprises(df_ent, df_sol, df_comparative)
+    # Diagnostic : liste des entreprises dans chaque feuille
+    # ...existing code...
+    # Utiliser directement les colonnes d'entreprises extraites de la feuille Analyse comparative
+    available_entreprises = entreprise_cols
     if not available_entreprises:
-        st.error("Aucune entreprise commune trouvée dans toutes les feuilles.")
+        st.error("Aucune colonne d'entreprise trouvée dans la feuille 'Analyse comparative'.")
         return
     # On lit la sélection globale depuis les cookies de session (clé utilisée dans show_sidebar)
     import json
