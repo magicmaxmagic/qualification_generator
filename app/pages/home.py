@@ -1,18 +1,9 @@
 # Utilitaire pour obtenir la liste cohérente des entreprises présentes dans toutes les feuilles nécessaires
 def get_available_entreprises(df_ent=None, df_sol=None, df_comp=None):
-    sets = []
+    # Retourne toutes les entreprises de la feuille Entreprise
     if df_ent is not None and LABEL_ENTREPRISES in df_ent.columns:
-        sets.append(set(df_ent[LABEL_ENTREPRISES].dropna().unique()))
-    if df_sol is not None and LABEL_ENTREPRISES in df_sol.columns:
-        sets.append(set(df_sol[LABEL_ENTREPRISES].dropna().unique()))
-    if df_comp is not None:
-        # Colonnes d'entreprises dans Comparatif (hors description)
-        entreprises_comp = [col for col in df_comp.columns if col not in COLS_DESCRIPTION and LABEL_INFORMATION_COMPLEMENTAIRE not in col]
-        sets.append(set(entreprises_comp))
-    if not sets:
-        return []
-    # Intersection de toutes les sources
-    return sorted(list(set.intersection(*sets)))
+        return sorted(list(df_ent[LABEL_ENTREPRISES].dropna().unique()))
+    return []
 # app/pages/home.py
 
 
@@ -362,8 +353,10 @@ def get_color_map(selected, entreprises):
 
 def clean_and_convert_df(df_comp, selected):
     df = df_comp.copy()
-    df = df[[*COLS_DESCRIPTION, *selected] if COLS_DESCRIPTION else selected]
-    for col in selected:
+    # Ne garder que les entreprises présentes dans les colonnes du comparatif
+    selected_cols = [col for col in selected if col in df.columns]
+    df = df[[*COLS_DESCRIPTION, *selected_cols] if COLS_DESCRIPTION else selected_cols]
+    for col in selected_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 

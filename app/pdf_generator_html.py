@@ -53,7 +53,7 @@ MSG_PDFKIT_NOT_FOUND = "Exécutable wkhtmltopdf introuvable."
 MSG_PDFKIT_ERROR = "Erreur pdfkit: {}"
 MSG_PDF_EXPORT_UNAVAILABLE = "L'export PDF n'est pas disponible sur cette plateforme."
 MSG_PDF_EXPORT_FATAL = "Erreur fatale lors de l'export PDF (bibliothèques système manquantes)."
-MSG_PDF_EXPORT_ERROR = "❌ Erreur lors de la génération PDF: {}"
+MSG_PDF_EXPORT_ERROR = "Erreur lors de la génération PDF: {}"
 MSG_REPORT_GEN_ERROR = "Erreur lors de la génération du rapport : {}"
 
 # Titres et labels globaux
