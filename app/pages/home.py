@@ -24,7 +24,7 @@ LABEL_NON_RESPECTE = "Non respecté"
 LABEL_STATUT = "Statut"
 LABEL_NB_CRITERES = "Nombre de critères"
 LABEL_TYPE_COUT = "Type de coût"
-LABEL_MONTANT = "Montant (€/$)"
+LABEL_MONTANT = "Montant ($)"
 LABEL_EFFECTIF = "Effectif"
 LABEL_EMPLOYES = "employé"
 LABEL_INFORMATION_COMPLEMENTAIRE = "Information complémentaire"
@@ -304,11 +304,11 @@ def show_costs(df_sol):
     st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_COST}</div>", unsafe_allow_html=True)
     if _show_costs_info_if_missing(df_sol):
         return
-    col_init, col_rec, col_ent = _find_cost_columns(df_sol)
-    if _show_costs_info_if_invalid_columns(col_init, col_rec, col_ent):
+    col_init, col_rec, col_sol = _find_cost_columns(df_sol)
+    if _show_costs_info_if_invalid_columns(col_init, col_rec, col_sol):
         return
     mois = _show_costs_sidebar_slider()
-    df_plot = _prepare_cost_dataframe(df_sol, col_ent, col_init, col_rec, mois)
+    df_plot = _prepare_cost_dataframe(df_sol, col_sol, col_init, col_rec, mois)
     if _show_costs_info_if_no_data(df_plot):
         return
     fig = _build_cost_bar_chart(df_plot)
@@ -322,7 +322,7 @@ def _show_costs_info_if_missing(df_sol):
 
 def _show_costs_info_if_invalid_columns(col_init, col_rec, col_ent):
     if not (col_init and col_rec and col_ent):
-        st.info("Colonnes 'Entreprises', 'Coûts initiaux' et/ou 'Coûts récurrents' non trouvées dans la feuille Solution.")
+        st.info("Colonnes 'Nom de la solution', 'Coûts initiaux' et/ou 'Coûts récurrents' non trouvées dans la feuille Solution.")
         return True
     return False
 
@@ -344,21 +344,42 @@ def _find_cost_columns(df_sol):
         nfkd = unicodedata.normalize('NFKD', str(name))
         return ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace(' ', '').replace("(","").replace(")","").replace("-","").replace("'","").lower()
 
+    col_sol = None
+    # Priorité absolue : colonne strictement 'Nom de la solution'
+    for col in df_sol.columns:
+        if normalize_colname(col) == "nomdelasolution":
+            col_sol = col
+            break
+    # Priorité 1 : colonne contenant à la fois 'nom' et 'solution'
+    if not col_sol:
+        for col in df_sol.columns:
+            norm = normalize_colname(col)
+            if "nom" in norm and "solution" in norm:
+                col_sol = col
+                break
+    # Priorité 2 : colonne contenant 'solution' seule si rien trouvé
+    if not col_sol:
+        for col in df_sol.columns:
+            norm = normalize_colname(col)
+            if "solution" in norm:
+                col_sol = col
+                break
+
     col_init = col_rec = col_ent = None
     init_variants = ["initial", "initiaux", "initiale", "initiales"]
     rec_variants = ["recurrent", "recurrents", "recurent", "recurents", "récurrent", "récurrents", "récurrente", "récurrentes", "annee", "année", "an"]
     for col in df_sol.columns:
         norm = normalize_colname(col)
         # Recherche plus souple pour les coûts initiaux
-        if "cout" in norm and any(v in norm for v in init_variants):
+        if col_init is None and "cout" in norm and any(v in norm for v in init_variants):
             col_init = col
         # Recherche plus souple pour les coûts récurrents, accepte fautes et variantes
-        if "cout" in norm and any(v in norm for v in rec_variants):
+        if col_rec is None and "cout" in norm and any(v in norm for v in rec_variants):
             col_rec = col
         # Recherche universelle pour entreprise
-        if "entreprise" in norm:
+        if col_ent is None and "entreprise" in norm:
             col_ent = col
-    return col_init, col_rec, col_ent
+    return col_init, col_rec, col_sol
 
 
 def _extract_amount(val):
@@ -380,12 +401,10 @@ def _extract_amount(val):
 def _extract_recurring(row, col_rec):
     import pandas as pd
     val = row[col_rec]
-    raw = str(val).lower() if not pd.isna(val) else ""
     montant = _extract_amount(val)
     if montant is None:
         return None
-    if "an" in raw or "année" in raw:
-        return montant / 12
+    # Les coûts récurrents sont déjà annuels, aucune conversion
     return montant
 
 
@@ -394,13 +413,16 @@ def _prepare_cost_dataframe(df_sol, col_ent, col_init, col_rec, mois):
     if any(col is None for col in [col_ent, col_init, col_rec]):
         return None
     df_plot = pd.DataFrame({
-        LABEL_ENTREPRISES: df_sol[col_ent],
+        "Solution": df_sol[col_ent],
         LABEL_COUT_INIT: df_sol[col_init].apply(_extract_amount),
         LABEL_COUT_REC: df_sol.apply(lambda row: _extract_recurring(row, col_rec), axis=1)
     })
-    df_plot[LABEL_COUT_TOTAL] = df_plot[LABEL_COUT_INIT].fillna(0) + df_plot[LABEL_COUT_REC].fillna(0) * mois
-    df_plot = df_plot.dropna(subset=[LABEL_ENTREPRISES], how="any")
-    df_agg = df_plot.groupby(LABEL_ENTREPRISES).agg({
+    # Les coûts récurrents sont annuels, donc on les ramène au mois puis on multiplie par le nombre de mois
+    df_plot[LABEL_COUT_REC] = df_plot[LABEL_COUT_REC].fillna(0) / 12 * mois
+    # Coût total = coût initial + coût récurrent (sur la période)
+    df_plot[LABEL_COUT_TOTAL] = df_plot[LABEL_COUT_INIT].fillna(0) + df_plot[LABEL_COUT_REC]
+    df_plot = df_plot.dropna(subset=["Solution"], how="any")
+    df_agg = df_plot.groupby("Solution").agg({
         LABEL_COUT_INIT: "sum",
         LABEL_COUT_REC: "sum",
         LABEL_COUT_TOTAL: "sum"
@@ -414,7 +436,7 @@ def _build_cost_bar_chart(df_agg):
     import plotly.express as px
     fig = px.bar(
         df_agg,
-        x=LABEL_ENTREPRISES,
+        x="Solution",
         y=[LABEL_COUT_INIT, LABEL_COUT_REC, LABEL_COUT_TOTAL],
         barmode="group",
         color_discrete_map={
@@ -426,7 +448,7 @@ def _build_cost_bar_chart(df_agg):
         labels={"value": LABEL_MONTANT, "variable": LABEL_TYPE_COUT, LABEL_ENTREPRISES: LABEL_ENTREPRISES}
     )
     fig.update_layout(
-        xaxis_title=LABEL_ENTREPRISES,
+        xaxis_title="Solution",
         yaxis_title="Montant prévisionnel (€ ou $)",
         margin=PLOTLY_MARGIN
     )
