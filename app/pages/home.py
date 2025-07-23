@@ -16,8 +16,8 @@ LABEL_HIST_COLOR = "Histogramme"
 LABEL_ANNEE_FONDATION = "Année de fondation"
 LABEL_ANNEE_CREATION = "Année de création"
 LABEL_LOGO = "Logo"
-LABEL_COUT_INIT = "Coût initial"
-LABEL_COUT_REC = "Coût récurrent"
+LABEL_COUT_INIT = "Coûts initiaux"
+LABEL_COUT_REC = "Coûts récurrents (année)"
 LABEL_COUT_TOTAL = "Coût total prévisionnel"
 LABEL_RESPECTE = "Respecté"
 LABEL_NON_RESPECTE = "Non respecté"
@@ -342,14 +342,20 @@ def _find_cost_columns(df_sol):
     import unicodedata
     def normalize_colname(name):
         nfkd = unicodedata.normalize('NFKD', str(name))
-        return ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace(' ', '').lower()
+        return ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace(' ', '').replace("(","").replace(")","").replace("-","").replace("'","").lower()
+
     col_init = col_rec = col_ent = None
+    init_variants = ["initial", "initiaux", "initiale", "initiales"]
+    rec_variants = ["recurrent", "recurrents", "recurent", "recurents", "récurrent", "récurrents", "récurrente", "récurrentes", "annee", "année", "an"]
     for col in df_sol.columns:
         norm = normalize_colname(col)
-        if norm == "coutsinitiaux":
+        # Recherche plus souple pour les coûts initiaux
+        if "cout" in norm and any(v in norm for v in init_variants):
             col_init = col
-        if norm == "coutsrecurrents":
+        # Recherche plus souple pour les coûts récurrents, accepte fautes et variantes
+        if "cout" in norm and any(v in norm for v in rec_variants):
             col_rec = col
+        # Recherche universelle pour entreprise
         if "entreprise" in norm:
             col_ent = col
     return col_init, col_rec, col_ent
