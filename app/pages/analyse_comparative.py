@@ -88,26 +88,31 @@ def display(all_dfs):
     if df_comparative is None:
         st.error("La feuille 'Analyse comparative' est introuvable dans le fichier Excel.")
         return
+    """
+    Fonction principale d'affichage de la page Analyse Comparative.
+    
+    Args:
+        all_dfs (dict): Dictionnaire contenant tous les DataFrames du fichier Excel
+    """
+    # Appliquer les styles de la sidebar
+    apply_sidebar_styles()
+    _render_page_header()
+    df_comparative = all_dfs.get("Analyse comparative")
+    df_ent = all_dfs.get("Entreprise")
+    df_sol = all_dfs.get("Solution")
+    if df_comparative is None:
+        st.error("La feuille 'Analyse comparative' est introuvable dans le fichier Excel.")
+        return
     success, df_filtered, entreprise_cols, _ = _prepare_data(df_comparative)
     if not success:
         return
-    # --- Synchronisation stricte avec la sélection globale de home.py ---
-    # Diagnostic : liste des entreprises dans chaque feuille
-    # ...existing code...
-    # Utiliser directement les colonnes d'entreprises extraites de la feuille Analyse comparative
-    available_entreprises = entreprise_cols
-    if not available_entreprises:
-        st.error("Aucune colonne d'entreprise trouvée dans la feuille 'Analyse comparative'.")
+    
+    solution_cols = entreprise_cols
+    if not solution_cols:
+        st.error("Aucune colonne de solution trouvée dans la feuille 'Analyse comparative'.")
         return
-    # On lit la sélection globale depuis les cookies de session (clé utilisée dans show_sidebar)
-    import json
-    from sidebar import cookies
-    raw = cookies.get('entreprises_selected')
-    selected_entreprises = json.loads(raw) if raw else available_entreprises
-    selected_entreprises = [e for e in selected_entreprises if e in available_entreprises]
-    if not selected_entreprises:
-        st.warning("Veuillez sélectionner au moins une entreprise dans la page d'accueil.")
-        return
+    # Toujours afficher toutes les solutions, sans dépendre de la sélection de la page d'accueil
+    selected_solutions = solution_cols
     # --- Interface utilisateur (filtres supplémentaires, sans multiselect entreprises) ---
     selected_types_exigence, selected_categories, selected_exigences = _setup_sidebar_filters(df_filtered)
     df_filtered_criteria = _filter_data_by_criteria(df_filtered, selected_types_exigence, selected_categories, selected_exigences)
@@ -115,7 +120,7 @@ def display(all_dfs):
         st.warning(LABEL_WARNING_NO_DATA)
         return
     # --- Affichage de la grille d'évaluation ---
-    _render_evaluation_grid(df_filtered_criteria, selected_entreprises)
+    _render_evaluation_grid(df_filtered_criteria, selected_solutions)
 
 
 def _render_page_header():
@@ -139,17 +144,14 @@ def _prepare_data(df_comparative):
             st.error("La feuille 'Analyse comparative' est vide.")
             return False, None, None, None
         
-        # Identifier les colonnes d'entreprises et justificatifs à partir de la 5ème colonne
-        # Structure alternée : Entreprise, Info complémentaire, Entreprise, Info complémentaire...
-        remaining_cols = df_comparative.columns[4:].tolist()
-        entreprise_cols = []
-        justificatif_cols = []
-        
-        for i, col in enumerate(remaining_cols):
-            if COL_INFO_COMP in col:
-                justificatif_cols.append(col)
-            else:
-                entreprise_cols.append(col)
+        # Extraire toutes les colonnes qui ne sont pas des colonnes de description ni des colonnes d'information complémentaire (robuste)
+        # Extraire toutes les colonnes de solutions (ni description, ni information complémentaire)
+        description_cols = [COL_FONCTIONNALITES, COL_CATEGORIES, COL_EXIGENCE, COL_DESCRIPTION]
+        def is_info_complementaire(col):
+            return 'information' in col.lower().replace('é','e').replace('è','e').replace('ê','e') and 'complementaire' in col.lower().replace('é','e').replace('è','e').replace('ê','e')
+        solution_cols = [col for col in df_comparative.columns if col not in description_cols and not is_info_complementaire(col)]
+        justificatif_cols = [col for col in df_comparative.columns if is_info_complementaire(col)]
+        entreprise_cols = solution_cols
         
         if not entreprise_cols:
             st.error("Aucune colonne d'entreprise trouvée dans les données.")
@@ -175,18 +177,6 @@ def _prepare_data(df_comparative):
         st.code(traceback.format_exc())
         return False, None, None, None
 
-
-def _setup_sidebar_controls(entreprise_cols, df_filtered):
-    """
-    Configure les contrôles de la sidebar pour la sélection d'entreprises et les filtres.
-    
-    Args:
-        entreprise_cols (list): Liste des colonnes d'entreprises
-        df_filtered (pd.DataFrame): DataFrame filtré des données
-        
-    Returns:
-        tuple: (selected_entreprises, selected_types_exigence, selected_categories, selected_exigences)
-    """
 def _setup_sidebar_filters(df_filtered):
     with st.sidebar:
         st.markdown(f"### {LABEL_FILTRES}")
