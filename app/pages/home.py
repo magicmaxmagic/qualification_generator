@@ -3,6 +3,11 @@ import plotly.express as px
 import pandas as pd
 from sidebar import show_sidebar, cookies
 import json
+import pandas as pd
+import pydeck as pdk
+import time
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
 
 # === CONSTANTES GLOBALES ===
 SCORE_GLOBAL = "Score global"
@@ -74,34 +79,167 @@ def display(all_dfs: dict):
     df_comp = all_dfs.get("Comparatif")
 
     show_header()
+    # Barre horizontale entre le header et la section logos
+    st.markdown("---")
     # On déplace la sélection d'entreprises AVANT l'affichage des logos
     # Liste cohérente des entreprises présentes dans toutes les feuilles
     available_entreprises = get_available_entreprises(df_ent, df_sol, df_comp)
-    selected_entreprises = show_sidebar(
+    # Uniformisation pour la sélection
+    def norm(x):
+        return x.strip().lower() if isinstance(x, str) else x
+    norm_map = {norm(e): e for e in available_entreprises}
+    norm_options = list(norm_map.keys())
+    # Sélectionne tout par défaut
+    selected_norm = show_sidebar(
         label=LABEL_ENTREPRISES,
-        options=available_entreprises,
-        default=available_entreprises,
+        options=norm_options,
+        default=norm_options,
         multiselect=True
-    ) if available_entreprises else []
-    show_bandeau_summary(df_ent, df_sol, df_comp, selected_entreprises)
+    ) if norm_options else []
+    # Remonte les valeurs originales pour le reste du dashboard
+    selected_entreprises = [norm_map[n] for n in selected_norm]
+    # Suppression complète : aucune fonction de résumé n'est appelée
     show_logos(df_ent, selected_entreprises)
     show_costs(df_sol)
+    show_global_map(df_ent)
+
+def show_global_map(df_ent):
+    
+    st.markdown("---")
+    st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>Carte des entreprises</div>", unsafe_allow_html=True)
+    if df_ent is None or df_ent.empty:
+        st.info("Aucune donnée d'entreprise disponible pour la carte.")
+        return
+    # Recherche des colonnes latitude/longitude
+    lat_col = None
+    lon_col = None
+    for col in df_ent.columns:
+        if col.lower() in ["latitude", "lat"]:
+            lat_col = col
+        if col.lower() in ["longitude", "lon", "lng"]:
+            lon_col = col
+    if lat_col and lon_col:
+        df_map = df_ent[[LABEL_ENTREPRISES, lat_col, lon_col]].dropna(subset=[lat_col, lon_col])
+        df_map = df_map.rename(columns={lat_col: "lat", lon_col: "lon"})
+        colors = [
+            [0, 114, 178, 200], [220, 53, 69, 200], [40, 167, 69, 200], [255, 193, 7, 200],
+            [108, 117, 125, 200], [111, 66, 193, 200], [255, 87, 51, 200], [23, 162, 184, 200],
+        ]
+        df_map['color'] = [colors[i % len(colors)] for i in range(len(df_map))]
+        layer = pdk.Layer(
+            'ScatterplotLayer',
+            df_map,
+            get_position='[lon,lat]',
+            get_radius=8000,
+            get_fill_color='color',
+            pickable=True
+        )
+        center_lat = df_map['lat'].iloc[0]
+        center_lon = df_map['lon'].iloc[0]
+        view = pdk.ViewState(latitude=center_lat, longitude=center_lon, zoom=7)
+        deck = pdk.Deck(
+            initial_view_state=view,
+            layers=[layer],
+            tooltip={
+                "html": "<b>📍 {name}</b><br/><b>Coordonnées:</b> {lat:.4f}, {lon:.4f}",
+                "style": {"backgroundColor": "rgba(255, 255, 255, 0.95)", "color": "black", "padding": "10px", "borderRadius": "8px", "boxShadow": "0 4px 16px rgba(0,0,0,0.2)"}
+            },
+        )
+        st.pydeck_chart(deck, use_container_width=True)
+    else:        
+        # Utilisation des colonnes de localisation personnalisées
+        loc_cols = [col for col in df_ent.columns if col.strip().lower() in ["localisation (siège social)", "localisation (québec)"]]
+        if loc_cols:
+            geolocator = Nominatim(user_agent="iveo_map")
+            geocode = RateLimiter(lambda x: geolocator.geocode(x, timeout=10), min_delay_seconds=1, max_retries=2, error_wait_seconds=2.0, swallow_exceptions=False)
+            # Fusionner les deux colonnes en une seule série de localisation, en ignorant les valeurs vides
+            df_map = df_ent[[LABEL_ENTREPRISES] + loc_cols].copy()
+            df_map['localisation'] = df_map[loc_cols].bfill(axis=1).iloc[:, 0]
+            df_map = df_map.dropna(subset=['localisation'])
+            import geopy.exc
+            def safe_geocode(x):
+                try:
+                    return geocode(str(x))
+                except (geopy.exc.GeocoderUnavailable, geopy.exc.GeocoderTimedOut, geopy.exc.GeocoderServiceError, Exception):
+                    return None
+            df_map['location'] = df_map['localisation'].apply(safe_geocode)
+            df_map = df_map[df_map['location'].notnull()]
+            df_map['lat'] = df_map['location'].apply(lambda loc: loc.latitude if loc else None)
+            df_map['lon'] = df_map['location'].apply(lambda loc: loc.longitude if loc else None)
+            df_map = df_map.dropna(subset=['lat', 'lon'])
+            # Supprimer la colonne 'location' avant d'afficher la carte (pydeck ne supporte pas les objets)
+            if 'location' in df_map.columns:
+                df_map = df_map.drop(columns=['location'])
+            if not df_map.empty:
+                # Regrouper les entreprises par coordonnées
+                df_grouped = df_map.groupby(['lat', 'lon']).agg({
+                    LABEL_ENTREPRISES: lambda x: list(x),
+                }).reset_index()
+                df_grouped['count'] = df_grouped[LABEL_ENTREPRISES].apply(len)
+                df_grouped['name'] = df_grouped[LABEL_ENTREPRISES].apply(lambda x: ', '.join(x))
+                colors = [
+                    [0, 114, 178, 200], [220, 53, 69, 200], [40, 167, 69, 200], [255, 193, 7, 200],
+                    [108, 117, 125, 200], [111, 66, 193, 200], [255, 87, 51, 200], [23, 162, 184, 200],
+                ]
+                df_grouped['color'] = [colors[i % len(colors)] for i in range(len(df_grouped))]
+                # Rayon plus grand pour visibilité mondiale
+                base_radius = 40000
+                df_grouped['radius'] = base_radius + (df_grouped['count'] - 1) * 20000
+                # Affichage du nombre si plusieurs entreprises
+                df_grouped['label'] = df_grouped.apply(lambda row: f"+{row['count']}" if row['count'] > 1 else '', axis=1)
+                scatter_layer = pdk.Layer(
+                    'ScatterplotLayer',
+                    df_grouped,
+                    get_position='[lon,lat]',
+                    get_radius='radius',
+                    get_fill_color='color',
+                    pickable=True,
+                    auto_highlight=True
+                )
+                text_layer = pdk.Layer(
+                    'TextLayer',
+                    df_grouped[df_grouped['label'] != ''],
+                    get_position='[lon,lat]',
+                    get_text='label',
+                    get_color=[0,0,0,255],
+                    get_size=32,
+                    get_alignment_baseline="bottom"
+                )
+                center_lat = df_grouped['lat'].iloc[0]
+                center_lon = df_grouped['lon'].iloc[0]
+                view = pdk.ViewState(latitude=center_lat, longitude=center_lon, zoom=2)
+                deck = pdk.Deck(
+                    initial_view_state=view,
+                    layers=[scatter_layer, text_layer],
+                    tooltip={
+                        "html": "<b>📍 {name}</b><br/><b>Coordonnées:</b> {lat:.4f}, {lon:.4f}",
+                        "style": {"backgroundColor": "rgba(255, 255, 255, 0.95)", "color": "black", "padding": "10px", "borderRadius": "8px", "boxShadow": "0 4px 16px rgba(0,0,0,0.2)"}
+                    },
+                )
+                st.pydeck_chart(deck, use_container_width=True)
+            else:
+                st.info("Impossible de géocoder les localisations (service indisponible ou timeout). Les points non géocodés sont ignorés.")
+        else:
+            st.info("Aucune colonne de localisation trouvée dans les données entreprises. La carte ne peut pas être affichée.")
     # Toutes les analyses doivent utiliser la même sélection globale !
     #show_frise(df_ent, selected_entreprises)
     # show_analyses(df_comp, df_sol, selected_entreprises)
 
 def show_bandeau_summary(df_ent, df_sol, df_comp, selected_entreprises=None):
-    """Affiche le bandeau récapitulatif avec le nombre d'entreprises, solutions, exigences, filtré si besoin."""
-    nb_entreprises = _filtered_count(df_ent, LABEL_ENTREPRISES, selected_entreprises)
-    nb_solutions = _filtered_solution_count(df_sol, selected_entreprises)
-    nb_exigences = _filtered_exigence_count(df_comp)
-    _display_bandeau_items(nb_entreprises, nb_solutions, nb_exigences)
-    st.markdown("---")
+    # Bandeau totalement supprimé, ne rien afficher ni exécuter
+    return
 
 def get_available_entreprises(df_ent=None, df_sol=None, df_comp=None):
     # Retourne toutes les entreprises de la feuille Entreprise
     if df_ent is not None and LABEL_ENTREPRISES in df_ent.columns:
-        return sorted(list(df_ent[LABEL_ENTREPRISES].dropna().unique()))
+        # Debug: afficher toutes les valeurs pour analyse
+        pass
+        entreprises = df_ent[LABEL_ENTREPRISES].astype(str)
+        entreprises = entreprises[entreprises.str.lower() != 'nan']
+        entreprises = entreprises[entreprises.str.strip() != '']
+        entreprises = entreprises.str.strip()
+        entreprises = entreprises.drop_duplicates()
+        return sorted(list(entreprises))
     return []
 
 def inject_responsive_css():
@@ -134,12 +272,8 @@ def show_header():
 
 
 def show_bandeau(df_ent, df_sol, df_comp, selected_entreprises=None):
-    """Affiche le bandeau récapitulatif avec le nombre d'entreprises, solutions, exigences, filtré si besoin."""
-    nb_entreprises = _filtered_count(df_ent, LABEL_ENTREPRISES, selected_entreprises)
-    nb_solutions = _filtered_solution_count(df_sol, selected_entreprises)
-    nb_exigences = _filtered_exigence_count(df_comp)
-    _display_bandeau_items(nb_entreprises, nb_solutions, nb_exigences)
-    st.markdown("---")
+    # Bandeau totalement supprimé, ne rien afficher ni exécuter
+    return
 
 def _filtered_count(df, col_name, selected=None):
     if df is None:
@@ -162,21 +296,8 @@ def _filtered_exigence_count(df_comp):
     return len(df_comp) if df_comp is not None else 0
 
 def _display_bandeau_items(nb_entreprises, nb_solutions, nb_exigences):
-    cols = st.columns(3)
-    items = [
-        (IMG_ENTREPRISE, COLOR_COST_TOTAL, nb_entreprises, LABEL_ENTREPRISES),
-        (IMG_SOL, COLOR_COST_INIT, nb_solutions, LABEL_SOLUTIONS),
-        (IMG_EXIG, COLOR_COST_REC, nb_exigences, LABEL_EXIGENCES)
-    ]
-    for i, (img, color, nb, label) in enumerate(items):
-        with cols[i % 3]:
-            st.markdown(
-                f"<div style='text-align:center;'>"
-                f"<img src='{img}' width='38'/><br>"
-                f"<span style='font-size:1.6em; color:{color}; font-weight:bold'>{nb}</span><br>"
-                f"<span style='color:#888;'>{label}</span></div>",
-                unsafe_allow_html=True
-            )
+    # Bandeau totalement supprimé, ne rien afficher ni exécuter
+    return
 
 
 def _get_logo_url(row, url_logo_col):
@@ -274,17 +395,6 @@ def _render_multiple_logos(logos, url_logo_col):
 """, unsafe_allow_html=True)
         start += 3
 
-
-#     df_classement = pd.DataFrame(classement).sort_values(SCORE_GLOBAL, ascending=False)
-#     fig_class = px.bar(
-#         df_classement,
-#         x=LABEL_ENTREPRISES,
-#         y=SCORE_GLOBAL,
-#     with col_left:
-#         st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_CLASSEMENT}</div>", unsafe_allow_html=True)
-#         st.plotly_chart(fig_class, use_container_width=True, key=KEY_PLOTLY_CLASS)
-#     with col_right:
-#         st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_REPARTITION}</div>", unsafe_allow_html=True)
     n_logos = len(logos)
     n_cols = 5
     if n_logos == 4:
@@ -298,88 +408,8 @@ def _render_multiple_logos(logos, url_logo_col):
             with cols[[0,2,4][idx]]:
                 logo_url = _get_logo_url(logos.iloc[idx], url_logo_col)
                 
-def show_costs(df_sol):
-    # Affiche le comparatif prévisionnel des coûts par entreprise.
-    st.markdown("---")
-    st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_COST}</div>", unsafe_allow_html=True)
-    if _show_costs_info_if_missing(df_sol):
-        return
-    col_init, col_rec, col_sol = _find_cost_columns(df_sol)
-    if _show_costs_info_if_invalid_columns(col_init, col_rec, col_sol):
-        return
-    mois = _show_costs_sidebar_slider()
-    df_plot = _prepare_cost_dataframe(df_sol, col_sol, col_init, col_rec, mois)
-    if _show_costs_info_if_no_data(df_plot):
-        return
-    fig = _build_cost_bar_chart(df_plot)
-    st.plotly_chart(fig, use_container_width=True, key=KEY_PLOTLY_COST)
+    # Suppression du rendu du graphique ici, cette fonction ne doit afficher que les logos
 
-def _show_costs_info_if_missing(df_sol):
-    if df_sol is None:
-        st.info("La feuille Solution n'est pas disponible dans le fichier Excel.")
-        return True
-    return False
-
-def _show_costs_info_if_invalid_columns(col_init, col_rec, col_ent):
-    if not (col_init and col_rec and col_ent):
-        st.info("Colonnes 'Nom de la solution', 'Coûts initiaux' et/ou 'Coûts récurrents' non trouvées dans la feuille Solution.")
-        return True
-    return False
-
-def _show_costs_sidebar_slider():
-    with st.sidebar:
-        mois = st.slider("Nombre de mois pour la prévision", min_value=1, max_value=120, value=12, key=KEY_SLIDER_MOIS)
-    return mois
-
-def _show_costs_info_if_no_data(df_plot):
-    if df_plot is None or df_plot.empty:
-        st.info("Aucune donnée de coût exploitable pour le comparatif.")
-        return True
-    return False
-
-
-def _find_cost_columns(df_sol):
-    import unicodedata
-    def normalize_colname(name):
-        nfkd = unicodedata.normalize('NFKD', str(name))
-        return ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace(' ', '').replace("(","").replace(")","").replace("-","").replace("'","").lower()
-
-    col_sol = None
-    # Priorité absolue : colonne strictement 'Nom de la solution'
-    for col in df_sol.columns:
-        if normalize_colname(col) == "nomdelasolution":
-            col_sol = col
-            break
-    # Priorité 1 : colonne contenant à la fois 'nom' et 'solution'
-    if not col_sol:
-        for col in df_sol.columns:
-            norm = normalize_colname(col)
-            if "nom" in norm and "solution" in norm:
-                col_sol = col
-                break
-    # Priorité 2 : colonne contenant 'solution' seule si rien trouvé
-    if not col_sol:
-        for col in df_sol.columns:
-            norm = normalize_colname(col)
-            if "solution" in norm:
-                col_sol = col
-                break
-
-    col_init = col_rec = col_ent = None
-    init_variants = ["initial", "initiaux", "initiale", "initiales"]
-    rec_variants = ["recurrent", "recurrents", "recurent", "recurents", "récurrent", "récurrents", "récurrente", "récurrentes", "annee", "année", "an"]
-    for col in df_sol.columns:
-        norm = normalize_colname(col)
-        # Recherche plus souple pour les coûts initiaux
-        if col_init is None and "cout" in norm and any(v in norm for v in init_variants):
-            col_init = col
-        # Recherche plus souple pour les coûts récurrents, accepte fautes et variantes
-        if col_rec is None and "cout" in norm and any(v in norm for v in rec_variants):
-            col_rec = col
-        # Recherche universelle pour entreprise
-        if col_ent is None and "entreprise" in norm:
-            col_ent = col
-    return col_init, col_rec, col_sol
 
 
 def _extract_amount(val):
@@ -453,3 +483,85 @@ def _build_cost_bar_chart(df_agg):
         margin=PLOTLY_MARGIN
     )
     return fig
+
+def show_costs(df_sol):
+    # Affiche le comparatif prévisionnel des coûts par entreprise.
+    st.markdown("---")
+    st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_COST}</div>", unsafe_allow_html=True)
+    if _show_costs_info_if_missing(df_sol):
+        return
+    col_init, col_rec, col_sol = _find_cost_columns(df_sol)
+    if _show_costs_info_if_invalid_columns(col_init, col_rec, col_sol):
+        return
+    mois = _show_costs_sidebar_slider()
+    df_plot = _prepare_cost_dataframe(df_sol, col_sol, col_init, col_rec, mois)
+    if _show_costs_info_if_no_data(df_plot):
+        return
+    fig = _build_cost_bar_chart(df_plot)
+    st.plotly_chart(fig, use_container_width=True, key=KEY_PLOTLY_COST)
+
+def _show_costs_info_if_missing(df_sol):
+    if df_sol is None:
+        st.info("La feuille Solution n'est pas disponible dans le fichier Excel.")
+        return True
+    return False
+
+def _show_costs_info_if_invalid_columns(col_init, col_rec, col_ent):
+    if not (col_init and col_rec and col_ent):
+        st.info("Colonnes 'Nom de la solution', 'Coûts initiaux' et/ou 'Coûts récurrents' non trouvées dans la feuille Solution.")
+        return True
+    return False
+
+def _show_costs_sidebar_slider():
+    with st.sidebar:
+        mois = st.slider("Nombre de mois pour la prévision", min_value=1, max_value=120, value=12, key=KEY_SLIDER_MOIS)
+    return mois
+
+def _show_costs_info_if_no_data(df_plot):
+    if df_plot is None or df_plot.empty:
+        st.info("Aucune donnée de coût exploitable pour le comparatif.")
+        return True
+    return False
+
+def _find_cost_columns(df_sol):
+    import unicodedata
+    def normalize_colname(name):
+        nfkd = unicodedata.normalize('NFKD', str(name))
+        return ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace(' ', '').replace("(","").replace(")","").replace("-","").replace("'","").lower()
+
+    col_sol = None
+    # Priorité absolue : colonne strictement 'Nom de la solution'
+    for col in df_sol.columns:
+        if normalize_colname(col) == "nomdelasolution":
+            col_sol = col
+            break
+    # Priorité 1 : colonne contenant à la fois 'nom' et 'solution'
+    if not col_sol:
+        for col in df_sol.columns:
+            norm = normalize_colname(col)
+            if "nom" in norm and "solution" in norm:
+                col_sol = col
+                break
+    # Priorité 2 : colonne contenant 'solution' seule si rien trouvé
+    if not col_sol:
+        for col in df_sol.columns:
+            norm = normalize_colname(col)
+            if "solution" in norm:
+                col_sol = col
+                break
+
+    col_init = col_rec = col_ent = None
+    init_variants = ["initial", "initiaux", "initiale", "initiales"]
+    rec_variants = ["recurrent", "recurrents", "recurent", "recurents", "récurrent", "récurrents", "récurrente", "récurrentes", "annee", "année", "an"]
+    for col in df_sol.columns:
+        norm = normalize_colname(col)
+        # Recherche plus souple pour les coûts initiaux
+        if col_init is None and "cout" in norm and any(v in norm for v in init_variants):
+            col_init = col
+        # Recherche plus souple pour les coûts récurrents, accepte fautes et variantes
+        if col_rec is None and "cout" in norm and any(v in norm for v in rec_variants):
+            col_rec = col
+        # Recherche universelle pour entreprise
+        if col_ent is None and "entreprise" in norm:
+            col_ent = col
+    return col_init, col_rec, col_sol

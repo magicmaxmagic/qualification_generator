@@ -473,7 +473,7 @@ def show_sidebar_comparatif(
         previous = entreprises_disponibles[:3]
 
     # Section de filtrage avec style moderne et icône élégante
-    create_sidebar_section(SIDEBAR_SECTION_FILTER, SIDEBAR_SECTION_FILTER_ICON)
+    #create_sidebar_section(SIDEBAR_SECTION_FILTER, SIDEBAR_SECTION_FILTER_ICON)
     # Ajout d'un petit texte d'aide stylé
     st.sidebar.markdown(f"""
     <div style="
@@ -489,6 +489,7 @@ def show_sidebar_comparatif(
         {SIDEBAR_FILTER_HELP}
     </div>
     """, unsafe_allow_html=True)
+    st.sidebar.markdown("<hr style='margin:0.7em 0 1.2em 0; border:0; border-top:2px solid #e0e0e0;'>", unsafe_allow_html=True)
     with st.sidebar.expander(SIDEBAR_FILTER_EXPANDER, expanded=True):
         all_sel = st.checkbox(
             SIDEBAR_FILTER_CHECKBOX,
@@ -508,6 +509,7 @@ def show_sidebar_comparatif(
     # on sérialise la sélection
     cookies[KEY_SEL] = json.dumps(sel)
     # Section couleurs avec style moderne et icône élégante
+    st.sidebar.markdown("<hr style='margin:0.7em 0 1.2em 0; border:0; border-top:2px solid #e0e0e0;'>", unsafe_allow_html=True)
     create_sidebar_section(SIDEBAR_SECTION_COLOR, "")
     # Ajout d'un petit texte d'aide stylé
     st.sidebar.markdown(f"""
@@ -598,35 +600,16 @@ def show_sidebar(
     if not previous:
         previous = default or options[:1]
     
-    # Section stylée avec icône contextuelle
-    icon = ""
-    create_sidebar_section(label, icon)
-    
-    # Ajout d'un indicateur de sélection
+    # Barre horizontale avant le filtre entreprises
+    st.sidebar.markdown("<hr style='margin:0.7em 0 1.2em 0; border:0; border-top:2px solid #e0e0e0;'>", unsafe_allow_html=True)
+    # Section minimaliste : uniquement le multiselect
     if multiselect:
-        selected_count = len(previous)
-        total_count = len(options)
-        st.sidebar.markdown(f"""
-        <div style="
-            background: rgba(248, 249, 250, 0.9);
-            border: 1px solid rgba(0, 114, 178, 0.2);
-            border-radius: 8px;
-            padding: 12px 16px;
-            margin: 16px 0;
-            color: #0072B2;
-            font-size: 0.9rem;
-            font-weight: 500;
-        ">
-            {selected_count}/{total_count} éléments sélectionnés
-        </div>
-        """, unsafe_allow_html=True)
-        
         sel = st.sidebar.multiselect(
             label,
             options,
             default=previous,
             key=KEY,
-            help=f"Sélectionnez parmi {total_count} options disponibles"
+            help=f"Sélectionnez parmi {len(options)} options disponibles"
         )
     else:
         st.sidebar.markdown("""
@@ -654,6 +637,8 @@ def show_sidebar(
         )
         sel = [choice]
 
+    # Barre horizontale après le filtre entreprises
+    st.sidebar.markdown("<hr style='margin:0.7em 0 1.2em 0; border:0; border-top:2px solid #e0e0e0;'>", unsafe_allow_html=True)
     cookies[KEY] = json.dumps(sel)
     return sel
 
