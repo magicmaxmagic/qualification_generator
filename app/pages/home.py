@@ -42,6 +42,7 @@ KEY_PLOTLY_REP = "plotly_rep"
 KEY_PLOTLY_COST = "plotly_cost_expander"
 
 COLOR_DEFAULT = "#0072B2"
+COLOR_COST_TITLE = "#000000"
 COLOR_COST_INIT = "#16a085"
 COLOR_COST_REC = "#e67e22"
 COLOR_COST_TOTAL = "#2980b9"
@@ -106,7 +107,7 @@ def display(all_dfs: dict):
 def show_global_map(df_ent):
     
     st.markdown("---")
-    st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>Carte des entreprises</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TITLE}; font-weight:600; margin-bottom:0.2em;'>Carte des entreprises</div>", unsafe_allow_html=True)
     if df_ent is None or df_ent.empty:
         st.info("Aucune donnée d'entreprise disponible pour la carte.")
         return
@@ -141,7 +142,7 @@ def show_global_map(df_ent):
             initial_view_state=view,
             layers=[layer],
             tooltip={
-                "html": "<b>📍 {name}</b><br/><b>Coordonnées:</b> {lat:.4f}, {lon:.4f}",
+                "html": "<b> {name}</b><br/><b>Coordonnées:</b> {lat:.4f}, {lon:.4f}",
                 "style": {"backgroundColor": "rgba(255, 255, 255, 0.95)", "color": "black", "padding": "10px", "borderRadius": "8px", "boxShadow": "0 4px 16px rgba(0,0,0,0.2)"}
             },
         )
@@ -320,7 +321,7 @@ def show_logos(df_ent, selected_entreprises=None):
         st.markdown('<div style="display:flex;justify-content:center;">', unsafe_allow_html=True)
         logo_url = _get_logo_url(row, url_logo_col)
         st.markdown(f"""
-<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px;'>
+<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px; padding-top:18px; padding-bottom:18px;'>
     <img src='{logo_url}' width='70' style='display:block;margin:0 auto 0.2em auto;' />
     <div style='text-align:center; font-size:0.95em; color:#555; font-weight:500;'>{row[LABEL_ENTREPRISES]}</div>
 </div>
@@ -333,7 +334,7 @@ def show_logos(df_ent, selected_entreprises=None):
             with cols[i]:
                 logo_url = _get_logo_url(row, url_logo_col)
                 st.markdown(f"""
-<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px;'>
+<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;min-width:120px; padding-top:18px; padding-bottom:18px;'>
     <img src='{logo_url}' width='70' style='display:block;margin:0 auto 0.2em auto;' />
     <div style='text-align:center; font-size:0.95em; color:#555; font-weight:500;'>{row[LABEL_ENTREPRISES]}</div>
 </div>
@@ -347,7 +348,7 @@ def show_logos(df_ent, selected_entreprises=None):
         df_ent = df_ent[df_ent[LABEL_ENTREPRISES].isin(selected_entreprises)]
 
     st.markdown(
-        f"<div style='text-align:center; font-size:1.1em; margin-bottom:0.5em; color:{COLOR_COST_TOTAL}; font-weight:bold;'>{TITRE_LOGOS}</div>",
+        f"<div style='text-align:center; font-size:1.1em; margin-bottom:0.5em; color:{COLOR_COST_TITLE}; font-weight:bold;'>{TITRE_LOGOS}</div>",
         unsafe_allow_html=True
     )
 
@@ -388,9 +389,8 @@ def _render_multiple_logos(logos, url_logo_col):
             with cols[col_pos]:
                 logo_url = _get_logo_url(row, url_logo_col)
                 st.markdown(f"""
-<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;width:100%;'>
+<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3em;width:100%; padding-top:18px; padding-bottom:18px;'>
     <img src='{logo_url}' width='70' style='display:block;margin:0 auto 0.2em auto;' />
-    <div style='text-align:center; font-size:0.95em; color:#555; font-weight:500;'>{row[LABEL_ENTREPRISES]}</div>
 </div>
 """, unsafe_allow_html=True)
         start += 3
@@ -407,9 +407,6 @@ def _render_multiple_logos(logos, url_logo_col):
         for idx in range(3):
             with cols[[0,2,4][idx]]:
                 logo_url = _get_logo_url(logos.iloc[idx], url_logo_col)
-                
-    # Suppression du rendu du graphique ici, cette fonction ne doit afficher que les logos
-
 
 
 def _extract_amount(val):
@@ -487,7 +484,7 @@ def _build_cost_bar_chart(df_agg):
 def show_costs(df_sol):
     # Affiche le comparatif prévisionnel des coûts par entreprise.
     st.markdown("---")
-    st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TOTAL}; font-weight:600; margin-bottom:0.2em;'>{TITRE_COST}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center; font-size:1.08em; color:{COLOR_COST_TITLE}; font-weight:600; margin-bottom:0.2em;'>{TITRE_COST}</div>", unsafe_allow_html=True)
     if _show_costs_info_if_missing(df_sol):
         return
     col_init, col_rec, col_sol = _find_cost_columns(df_sol)
