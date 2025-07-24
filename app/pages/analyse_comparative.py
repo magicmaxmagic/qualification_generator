@@ -96,7 +96,6 @@ def display(all_dfs):
     """
     # Appliquer les styles de la sidebar
     apply_sidebar_styles()
-    _render_page_header()
     df_comparative = all_dfs.get("Analyse comparative")
     df_ent = all_dfs.get("Entreprise")
     df_sol = all_dfs.get("Solution")

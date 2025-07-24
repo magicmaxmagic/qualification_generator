@@ -2,7 +2,7 @@
 # =================== VARIABLES GLOBALES (labels, titres, messages, navigation) ===================
 PAGE_TITLE = "Tableau de bord IVÉO"
 PAGE_ICON = "https://iveo.ca/themes/core/assets/images/content/logos/logo-iveo.svg"
-NAV_PAGES = ("Accueil", "Entreprise", "Solution", "Analyse comparative", "Assistant IA")
+NAV_PAGES = ("Accueil", "Entreprise", "Solution", "Analyse comparative")
 ERROR_NO_FILE = "Fichier non trouvé. Déposez-le, corrigez le chemin ou utilisez une URL valide."
 UPLOAD_LABEL = "Ou déposez un fichier Excel (.xlsx)"
 UPLOAD_TYPE = "xlsx"
@@ -38,7 +38,7 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 import io
 from app import utils
-from app.pages import analyse_comparative, home, entreprise, solution, chatbot
+from app.pages import analyse_comparative, home, entreprise, solution
 import sidebar
 
 # -----------------------------------------------------------------------------
@@ -221,14 +221,14 @@ elif page == NAV_PAGES[3]:  # Analyse comparative
         analyse_comparative.display(all_dfs)
     else:
         st.error(ERROR_COMP)
-elif page == NAV_PAGES[4]:  # Assistant IA
-    all_dfs = {
-        "Analyse comparative": df_comp,
-        "Entreprise": df_ent,
-        "Solutions": df_sol,
-        "Alignement": df_align
-    }
-    chatbot.display(all_dfs)
+# elif page == NAV_PAGES[4]:  # Assistant IA
+#     all_dfs = {
+#         "Analyse comparative": df_comp,
+#         "Entreprise": df_ent,
+#         "Solutions": df_sol,
+#         "Alignement": df_align
+#     }
+#     chatbot.display(all_dfs)
 
 # -----------------------------------------------------------------------------
 # 8) Section d'export PDF à la fin de la sidebar
