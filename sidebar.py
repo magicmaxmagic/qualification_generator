@@ -473,7 +473,7 @@ def show_sidebar_comparatif(
         previous = entreprises_disponibles[:3]
 
     # Section de filtrage avec style moderne et icône élégante
-    #create_sidebar_section(SIDEBAR_SECTION_FILTER, SIDEBAR_SECTION_FILTER_ICON)
+    create_sidebar_section(SIDEBAR_SECTION_FILTER, SIDEBAR_SECTION_FILTER_ICON)
     # Ajout d'un petit texte d'aide stylé
     st.sidebar.markdown(f"""
     <div style="

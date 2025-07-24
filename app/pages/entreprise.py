@@ -1,3 +1,5 @@
+# Valeur par défaut pour les champs vides
+LABEL_INFO_VALEUR_PAR_DEFAUT = "N/A"
 import streamlit as st
 from sidebar import show_sidebar
 import pandas as pd
@@ -616,10 +618,26 @@ def display(df_ent: pd.DataFrame):
         default=entreprises[:1],
         multiselect=False
     )
+    # Nettoyage du nom sélectionné pour enlever crochets et quotes
+    def clean_name(val):
+        import re
+        if isinstance(val, list) and val:
+            val = val[0]
+        val = str(val)
+        val = re.sub(r"^\[|'|\"|\[|\]$", "", val)
+        val = val.strip("[]'")
+        return val
+    clean_selected = clean_name(selected)
     # Filtrer le DataFrame selon la sélection
-    info = df_ent[df_ent[LABEL_ENTREPRISES].isin(selected)].iloc[0] if selected else df_ent.iloc[0]
+    info = df_ent[df_ent[LABEL_ENTREPRISES].isin([clean_selected])].iloc[0] if clean_selected else df_ent.iloc[0]
     color = THEME['accent']
-    selected_fields = df_ent.columns.tolist()[:4]  # Par défaut, les 4 premiers champs
+    # Champs visibles : tous les champs non vides pour l'entreprise sélectionnée
+    general_fields = [c for c in df_ent.columns if c != LABEL_ENTREPRISES and c.lower() not in ['description','url (logo)','url (vidéo)','website','site web'] and not c.lower().startswith('description') and not c.lower().startswith('url')]
+    # On sélectionne par défaut tous les champs non vides pour l'entreprise sélectionnée
+    default_fields = [f for f in general_fields if pd.notna(info.get(f, None)) and str(info.get(f, '')).strip() and str(info.get(f, '')).lower() not in ['nan', 'n/a', '-', '']]
+    # Multiselect juste après le choix d'entreprise
+    selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, general_fields, default=default_fields, key='fields_entreprise')
+    st.sidebar.color_picker(LABEL_COULEUR_PRINCIPALE, THEME['accent'])
     st.markdown("""
     <style>
     .main .block-container {
@@ -667,14 +685,41 @@ def display(df_ent: pd.DataFrame):
     """, unsafe_allow_html=True)
     render_header(LABEL_FICHE_ENTREPRISE)
     st.markdown(SEPARATOR, unsafe_allow_html=True)
-    col_left, col_right = st.columns([1, 1])
-    with col_left:
-        render_left_column(info, selected_fields)
-    with col_right:
+    # Affichage description à gauche, logo/nom à droite
+    col_desc, col_logo = st.columns([1, 1])
+    with col_desc:
+        render_description_section(info)
+    with col_logo:
         url_site = get_url_site(info)
         video = info.get('URL (vidéo)', '')
-        render_logo_section(selected, info, color, url_site, video)
-        st.markdown(SEPARATOR, unsafe_allow_html=True)
-        render_description_section(info)
-        st.markdown(SEPARATOR, unsafe_allow_html=True)
-        render_map_section(info)
+        render_logo_section(clean_selected, info, color, url_site, video)
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+    # Affichage des autres informations en bas, centrées
+    render_section(LABEL_INFOS_GENERALES)
+    info_items = []
+    for f in selected_fields:
+        val = info.get(f, LABEL_INFO_VALEUR_PAR_DEFAUT)
+        if pd.notna(val) and str(val).strip() and str(val).lower() not in ['nan', 'n/a', '-', '']:
+            info_items.append((f, val))
+    card_style = (
+        f'background:{THEME["glass_bg"]};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+        'padding:14px 18px;margin:0 0 12px 0;width:100%;'
+        f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
+        'position:relative;overflow:hidden;'
+    )
+    def render_card(f, val):
+        return f'''<div style="{card_style}">
+            <strong style="font-size:1.0rem;font-weight:700;color:{THEME['primary']};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{f}</strong>
+            <div style="font-size:1.3rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
+        </div>'''
+    if info_items:
+        if len(info_items) == 1:
+            f, val = info_items[0]
+            html = f"<div style='display:flex;justify-content:center;width:100%;'>{render_card(f, val)}</div>"
+            st.markdown(html, unsafe_allow_html=True)
+        else:
+            cols = st.columns(2)
+            for i, (f, val) in enumerate(info_items):
+                with cols[i % 2]:
+                    st.markdown(render_card(f, val), unsafe_allow_html=True)
+        # Section localisation supprimée

@@ -545,8 +545,33 @@ def _setup_sidebar_inputs(solutions: list) -> tuple[str, list, Any]:
     else:
         selected = ""
     cookies['solution_selected'] = json.dumps([selected])
-    
-    # Section d'ajout d'images
+
+    # Champs visibles : tous les champs valides pour la solution sélectionnée
+    import pandas as pd
+    df_sol = st.session_state.get('df_sol', None)
+    info = None
+    general_fields = []
+    default_fields = []
+    selected_fields = []
+    if df_sol is not None and selected:
+        # Trouver la colonne solution
+        solution_column = None
+        for col in df_sol.columns:
+            if col.lower() in ['solution', 'solutions']:
+                solution_column = col
+                break
+        if solution_column:
+            info = df_sol[df_sol[solution_column] == selected].iloc[0]
+            general_fields = [c for c in df_sol.columns if c.lower() not in ['solution','solutions','description','images','site web','url (logo)','url (vidéo)','website'] and not c.lower().startswith('description') and not c.lower().startswith('url')]
+            default_fields = general_fields.copy()
+            sidebar_fields_key = f"fields_solution_sidebar_{selected}_{hash(tuple(general_fields))}" if selected else "fields_solution_sidebar"
+            st.sidebar.markdown(f"**{LABEL_CHAMPS_VISIBLES}**")
+            # Supprime toute sélection précédente pour forcer la sélection de tous les champs à chaque affichage
+            for key in list(st.session_state.keys()):
+                if key.startswith("fields_solution_sidebar_"):
+                    del st.session_state[key]
+            selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, general_fields, default=general_fields, key=sidebar_fields_key)
+            st.session_state['selected_fields_sidebar'] = selected_fields
     st.sidebar.markdown("---")
     st.sidebar.markdown(f"**{LABEL_AJOUTER_IMAGES}**")
     # URLs d'images
@@ -572,11 +597,11 @@ def _setup_sidebar_inputs(solutions: list) -> tuple[str, list, Any]:
         accept_multiple_files=True,
         key=f'uploaded_images_{st.session_state["file_uploader_key"]}'
     )
-    
+
     # S'assurer que selected est toujours une chaîne de caractères
     if selected is None:
         selected = ""
-    return selected, image_urls, uploaded_images
+    return selected, image_urls, uploaded_images, selected_fields
 
 def _handle_image_persistence(selected: str, image_urls: list, uploaded_images: Any) -> tuple[list, list]:
     """
@@ -822,14 +847,14 @@ def _render_info_with_images(df_sol: pd.DataFrame, solution_column: str, info: p
         persistent_files (list): Liste des fichiers persistants
     """
     col_left2, col_right2 = st.columns([1, 1])
-    
     with col_left2:
         render_section(LABEL_INFOS_GENERALES)
         fields = [c for c in df_sol.columns if c != solution_column and 
                  c.lower() not in ['description','url (logo)','url (vidéo)','website','site web'] and
                  not c.lower().startswith('description') and
                  not c.lower().startswith('url')]
-        selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, fields, default=fields[:4], key='fields_solution')
+        sidebar_fields_key = f"fields_solution_withimg_{info.get(solution_column, '')}" if info.get(solution_column, '') else "fields_solution_withimg"
+        selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, fields, default=fields[:4], key=sidebar_fields_key)
         _render_info_cards(selected_fields, info)
     with col_right2:
         render_section(LABEL_IMAGES)
@@ -846,22 +871,18 @@ def _render_info_without_images(df_sol: pd.DataFrame, solution_column: str, info
         info (pd.Series): Données de la solution
     """
     render_section(LABEL_INFOS_GENERALES)
-    fields = [c for c in df_sol.columns if c != solution_column and 
-             c.lower() not in ['description','url (logo)','url (vidéo)','website','site web'] and
-             not c.lower().startswith('description') and
-             not c.lower().startswith('url')]
-    selected_fields = st.sidebar.multiselect(LABEL_CHAMPS_VISIBLES, fields, default=fields[:6], key='fields_solution')
-    
-    # Diviser en deux groupes
-    mid_point = (len(selected_fields) + 1) // 2
-    fields_left = selected_fields[:mid_point]
-    fields_right = selected_fields[mid_point:]
-    
+    # Utilise le multiselect défini dans _setup_sidebar_inputs
+    selected_fields = st.session_state.get('selected_fields_sidebar', [])
+    display_fields = selected_fields
+    mid_point = (len(display_fields) + 1) // 2
+    fields_left = display_fields[:mid_point]
+    fields_right = display_fields[mid_point:]
+
     col_info_left, col_info_right = st.columns([1, 1])
-    
+
     with col_info_left:
         _render_info_cards(fields_left, info)
-    
+
     with col_info_right:
         _render_info_cards(fields_right, info, start_index=mid_point)
 
@@ -886,24 +907,26 @@ def _render_info_cards(fields: list, info: pd.Series, start_index: int = 0):
     for i, f in enumerate(fields):
         # Si le champ est exactement 'URL', utiliser le label global
         if f.strip().upper() == 'URL':
-            display_field = LABEL_URL
+            continue  # Ne jamais afficher la carte URL
         elif f.strip().upper() == 'FICHIER':
             display_field = LABEL_FICHIER
         else:
             display_field = f
         val = info.get(f, LABEL_INFO_VALEUR_PAR_DEFAUT)
-        if pd.notna(val) and str(val).strip():
-            card_bg = THEME['glass_bg'] if (i + start_index) % 2 == 0 else THEME['glass_bg_blue']
-            card_style = (
-                f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
-                'padding:14px 18px;margin:0 0 12px 0;width:100%;'
-                f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
-                'position:relative;overflow:hidden;'
-            )
-            cards += f'''<div style="{card_style}">
-                <strong style="font-size:1.0rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{display_field}</strong>
-                <div style="font-size:1.3rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
-            </div>'''
+        # Affiche la carte seulement si la valeur est non vide et non N/A
+        if not (pd.notna(val) and str(val).strip()) or str(val).lower() in ['nan', 'n/a', '-', '']:
+            continue
+        card_bg = THEME['glass_bg'] if (i + start_index) % 2 == 0 else THEME['glass_bg_blue']
+        card_style = (
+            f'background:{card_bg};border:1px solid {THEME["glass_border"]};border-radius:12px;'
+            'padding:14px 18px;margin:0 0 12px 0;width:100%;'
+            f'box-shadow:0 4px 16px rgba(0,114,178,0.12);transition:all 0.3s ease;'
+            'position:relative;overflow:hidden;'
+        )
+        cards += f'''<div style="{card_style}">
+            <strong style="font-size:1.0rem;font-weight:700;color:{THEME["primary"]};display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">{display_field}</strong>
+            <div style="font-size:1.3rem;color:#000;font-weight:600;line-height:1.3;">{val}</div>
+        </div>'''
     if cards:
         grid_section_html = f'''<div style="{cards_container_style}">
             <div style="display:flex;flex-direction:column;gap:0;width:100%;">{cards}</div>
@@ -1027,77 +1050,34 @@ def display(df_sol: pd.DataFrame):
     """
     Fonction principale d'affichage de la page Solution, refactorisée pour une meilleure maintenabilité.
     """
-    st.markdown("""
-    <style>
-    .main .block-container {
-        background: linear-gradient(135deg, #e3f0fa 0%, #f8f9fa 50%, #e9ecef 100%);
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
-        position: relative;
-        min-height: 100vh;
-    }
-    .main .block-container::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: 
-            radial-gradient(circle at 25% 25%, rgba(0,114,178,0.05) 0%, transparent 50%),
-            radial-gradient(circle at 75% 75%, rgba(227,240,250,0.08) 0%, transparent 50%);
-        pointer-events: none;
-        z-index: -1;
-    }
-    .stSelectbox > div > div {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 12px rgba(255,255,255,0.08) !important;
-    }
-    .stMultiSelect > div > div {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
-    }
-    .stColorPicker > div > div {
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 12px rgba(0,114,178,0.08) !important;
-    }
-    .css-1d391kg {
-        background: rgba(255, 255, 255, 0.85) !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    apply_sidebar_styles()
+    _apply_page_styles()
+    _apply_page_styles()
+    # Validation du DataFrame
+    is_valid, result = _validate_dataframe(df_sol)
+    if not is_valid:
+        st.error(result)
+        return
+    solution_column = result
+    solutions = df_sol[solution_column].dropna().unique()
+    selected, image_urls, uploaded_images, selected_fields = _setup_sidebar_inputs(list(solutions))
+    info = df_sol[df_sol[solution_column] == selected].iloc[0] if selected else df_sol.iloc[0]
+    cookies['solution_selected'] = json.dumps([selected])
+    st.session_state['selected_fields_sidebar'] = selected_fields
+    persistent_urls, persistent_files = _handle_image_persistence(selected, image_urls, uploaded_images)
+    _render_persistent_images_sidebar(selected, persistent_urls, persistent_files)
+    url_site, video = _get_solution_urls(info)
+    desc = _get_description(info, df_sol)
+    images_urls = _collect_all_images(info, persistent_urls, image_urls)
     render_header(LABEL_FICHE_SOLUTION)
     st.markdown(SEPARATOR, unsafe_allow_html=True)
-    # Sélection globale d'entreprise(s)
-    if df_sol is None or df_sol.empty or LABEL_ENTREPRISES not in df_sol.columns:
-        st.error("Aucune donnée d'entreprise disponible.")
-        return
-    entreprises = df_sol[LABEL_ENTREPRISES].dropna().unique().tolist()
-    selected = show_sidebar(
-        label=LABEL_CHOISISSEZ_ENTREPRISE,
-        options=entreprises,
-        default=entreprises[:1],
-        multiselect=False
-    )
-    
-    # Filtrer le DataFrame selon la sélection
-    info = df_sol[df_sol[LABEL_ENTREPRISES].isin(selected)].iloc[0] if selected else df_sol.iloc[0]
-    color = THEME['accent']
-    selected_fields = df_sol.columns.tolist()[:4]  # Par défaut, les 4 premiers champs
-    col_left, col_right = st.columns([1, 1])
-    with col_left:
-        render_left_column(info, selected_fields)
-    with col_right:
-        url_site = get_url_site(info)
-        video = info.get('URL (vidéo)', '')
-        render_logo_section(selected, info, color, url_site, video)
-        st.markdown(SEPARATOR, unsafe_allow_html=True)
-        render_description_section(info)
-        st.markdown(SEPARATOR, unsafe_allow_html=True)
-        render_map_section(info)
+    col_desc, col_name = st.columns([1, 1])
+    with col_desc:
+        _render_description_section(desc)
+    with col_name:
+        render_logo_and_name(selected, info.get('URL (logo)', ''), THEME['accent'], url_site, video)
+    st.markdown(SEPARATOR, unsafe_allow_html=True)
+    if images_urls or persistent_files:
+        _render_info_with_images(df_sol, solution_column, info, images_urls, persistent_files)
+    else:
+        _render_info_without_images(df_sol, solution_column, info)
